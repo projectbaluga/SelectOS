@@ -2,117 +2,112 @@
 
 Lightweight UEFI multi-boot selector.
 
-SelectOS boots a minimal Linux environment, detects installed operating systems, and presents a clean configurable menu so the user can choose which OS to start.
+SelectOS is intended to boot a minimal Linux environment, detect installed operating systems, and present a configurable menu for choosing an OS.
 
-## Features
+> **Build status:** the repository contains the image-building scripts and configuration, but does not currently contain the kernel, initramfs, or UEFI executable binaries. A bootable image cannot be produced until those real, compatible files are supplied. The build intentionally fails rather than creating placeholder binaries.
 
-- Full UEFI support (including Secure Boot / MokManager)
-- Simple JSON configuration for branding and OS presentation
-- Tiny initramfs (BusyBox + essential drivers + custom Go binary)
-- Easy to rebuild and deploy to USB
+## Repository contents and build inputs
 
-## Requirements to build
+The image builder expects these files:
 
-You need these binary components (not included in the git repository because of size):
+| Required path | Purpose |
+|---|---|
+| `boot/vmlinuz` | Linux kernel |
+| `boot/select.img` | SelectOS initramfs, including its `/init` program |
+| `EFI/BOOT/BOOTX64.EFI` | UEFI removable-media boot manager |
+| `EFI/BOOT/grubx64.efi` | GRUB EFI executable |
+| `EFI/BOOT/mmx64.efi` | MokManager executable, if required by the chosen GRUB build |
 
-| File                    | Description                     | Approx size |
-|-------------------------|---------------------------------|-------------|
-| `boot/vmlinuz`          | Linux kernel                    | ~15 MB      |
-| `boot/select.img`       | Initramfs (contains the Go init)| ~2.2 MB     |
-| `EFI/BOOT/BOOTX64.EFI`  | UEFI bootloader                 | ~1 MB       |
-| `EFI/BOOT/grubx64.efi` | GRUB EFI                        | ~2.6 MB     |
-| `EFI/BOOT/mmx64.efi`   | MokManager (Secure Boot)        | ~0.8 MB     |
+The repository currently tracks configuration and build scripts, not the source/build recipes needed to recreate all five binaries. Obtain them from a trusted SelectOS build or build them from their corresponding upstream sources and the project's own initramfs source. Do not substitute empty files, arbitrary EFI executables, or binaries from an unrelated image.
 
-These can be extracted from the original `select-test.img`:
+## Prepare the boot-binaries release asset
 
-```bash
-gunzip -c select-test.img.gz > select-test.img
-sudo losetup -fP --show select-test.img   # note the loop device
-sudo mount /dev/loopXp1 /mnt
+Create a gzip-compressed tar archive whose paths are relative to the repository root and exactly match the table above. The archive must contain all five files, not an enclosing directory.
 
-mkdir -p boot EFI/BOOT
-cp /mnt/boot/vmlinuz          boot/
-cp /mnt/boot/select.img       boot/
-cp /mnt/EFI/BOOT/*.efi        EFI/BOOT/
+Example archive layout:
+
+```text
+boot/vmlinuz
+boot/select.img
+EFI/BOOT/BOOTX64.EFI
+EFI/BOOT/grubx64.efi
+EFI/BOOT/mmx64.efi
 ```
 
-## Quick build
+After obtaining the real files, create `boot-binaries.tar.gz` and attach it to a GitHub Release in this repository. Name the asset exactly `boot-binaries.tar.gz`. The workflow input `binaries_release` must be `latest` or the exact release tag.
+
+For maintainers using GitHub CLI from a trusted machine where the files are already prepared:
 
 ```bash
-# Make sure the binary files above are in place, then:
-./scripts/build-image.sh
+tar -czf boot-binaries.tar.gz boot/vmlinuz boot/select.img \
+  EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi
+tar -tzf boot-binaries.tar.gz
+gh release create binaries boot-binaries.tar.gz --repo projectbaluga/SelectOS
 ```
 
-This creates `dist/SelectOS.img` (512 MB FAT32 UEFI image).
+To replace the asset on an existing release:
 
-## Building via GitHub Actions
+```bash
+gh release upload binaries boot-binaries.tar.gz \
+  --repo projectbaluga/SelectOS --clobber
+```
 
-For a manual cloud build, open **Actions → Build SelectOS image → Run workflow**, then download the `SelectOS.img` artifact from the completed run. This workflow runs only when manually triggered.
+Keep the release asset private to the repository's intended distribution and verify the licensing and provenance of every included binary.
 
-The workflow downloads `boot-binaries.tar.gz` from a GitHub Release and extracts it into the repository before checking the required files. The `binaries_release` input selects the release tag; it defaults to `latest`. Set it to a specific tag (for example, `binaries`) when the latest release is not the one containing the boot binaries. If the download or extraction fails, the required-files check stops the build with a clear error.
+## Build with GitHub Actions
 
-### Creating or updating the binaries release
+1. Open **Actions** in this repository.
+2. Select **Build SelectOS image**.
+3. Choose **Run workflow**.
+4. Set `binaries_release` to `latest` or the exact tag containing `boot-binaries.tar.gz`.
+5. Run the workflow and inspect its logs.
+6. If successful, download the `SelectOS-image` artifact.
 
-1. Extract the kernel, initramfs, and EFI files from the test image using the commands in [Requirements to build](#requirements-to-build), so the files exist at `boot/vmlinuz`, `boot/select.img`, and `EFI/BOOT/*.efi`.
-2. From the repository root, create the archive:
+The workflow validates the archive and all required files before invoking the image builder. A missing release, missing archive member, corrupt archive, or empty file stops the job with an explicit error. The workflow does not manufacture boot binaries.
 
-   ```bash
-   tar czf boot-binaries.tar.gz boot/vmlinuz boot/select.img EFI/BOOT/*.efi
-   ```
+## Build locally
 
-3. Create the release and upload the asset:
+On an Ubuntu/Debian system with the required binaries in place:
 
-   ```bash
-   gh release create binaries boot-binaries.tar.gz
-   ```
+```bash
+sudo apt-get update
+sudo apt-get install -y parted dosfstools util-linux
+sudo bash scripts/build-image.sh
+```
 
-   To update an existing release instead, upload the new archive:
-
-   ```bash
-   gh release upload binaries boot-binaries.tar.gz --clobber
-   ```
-
-The workflow's `GITHUB_TOKEN` needs permission to read repository releases. The local build above remains available as the primary path.
+This creates `dist/SelectOS.img`, a 512 MiB FAT32 UEFI image.
 
 ## Write to USB
+
+**Warning:** writing an image erases the selected device. Verify the device path carefully before running this command.
 
 ```bash
 sudo dd if=dist/SelectOS.img of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-**Warning:** Double-check the target device (`/dev/sdX`). This will erase everything on it.
+Replace `/dev/sdX` with the correct USB device. Never guess the device name.
 
 ## Configuration
 
-Edit `config/select.json`:
-
-```json
-{
-  "brand": { "name": "SelectOS", "subtitle": "Multi-boot Selector" },
-  "os": [
-    { "match": "windows", "name": "Windows 11", "subtitle": "Microsoft Windows", "order": 1 },
-    { "match": "ubuntu",  "name": "Ubuntu",     "subtitle": "Ubuntu Linux",      "order": 2 }
-  ]
-}
-```
-
-- New operating systems appear automatically.
-- Only add rules when you want to rename, reorder, hide, or assign a custom icon.
+Edit `config/select.json` to change branding and operating-system presentation rules.
 
 ## Project structure
 
-```
+```text
 SelectOS/
-├── config/select.json       ← main configuration
-├── boot/select.img          ← initramfs (provided before build)
-├── boot/grub/grub.cfg       ← GRUB menu
-├── EFI/BOOT/grub.cfg        ← EFI chainloader
-├── scripts/build-image.sh   ← image builder
-├── icons/                   ← optional icons
-└── src/                     ← future Go source
+├── .github/workflows/build-image.yml
+├── config/select.json
+├── boot/grub/grub.cfg
+├── EFI/BOOT/grub.cfg
+├── scripts/build-image.sh
+├── icons/
+└── src/
 ```
+
+## Known implementation work
+
+The current tracked `src/` directory does not yet provide the initramfs build recipe or the runtime `/init` implementation. Those are prerequisites for a reproducible end-to-end build. The GRUB configuration and image layout also need to be tested against the actual kernel/initramfs pair and target firmware before describing the image as production-ready.
 
 ## License
 
-Scripts, configuration and documentation: MIT License.  
-Kernel, GRUB binaries and the Go init binary retain their original licenses.
+See [LICENSE](LICENSE). Kernel, GRUB, MokManager, and other third-party binaries retain their respective upstream licenses.

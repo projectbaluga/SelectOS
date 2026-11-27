@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       binaries_release:
-        description: "Release tag containing boot-binaries.tar.gz (use latest for the latest release)"
+        description: "Release tag containing boot-binaries.tar.gz (latest or an exact tag)"
         required: false
         type: string
         default: latest
@@ -25,54 +25,51 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y parted dosfstools util-linux
 
-      - name: Download boot binaries from release
+      - name: Download and validate boot binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BINARIES_RELEASE: ${{ inputs.binaries_release }}
         shell: bash
         run: |
-          set +e
+          set -Eeuo pipefail
+
+          args=(--repo "$GITHUB_REPOSITORY" --pattern boot-binaries.tar.gz --dir .)
           if [[ "$BINARIES_RELEASE" == "latest" || -z "$BINARIES_RELEASE" ]]; then
-            gh release download --repo "$GITHUB_REPOSITORY" \
-              --pattern boot-binaries.tar.gz --dir .
+            gh release download "${args[@]}"
           else
-            gh release download "$BINARIES_RELEASE" --repo "$GITHUB_REPOSITORY" \
-              --pattern boot-binaries.tar.gz --dir .
+            gh release download "$BINARIES_RELEASE" "${args[@]}"
           fi
-          download_status=$?
 
-          if (( download_status == 0 )) && [[ -f boot-binaries.tar.gz ]]; then
-            tar -xzf boot-binaries.tar.gz -C . || echo "::warning::Could not extract boot-binaries.tar.gz; required-file validation will report missing files."
-          else
-            echo "::warning::Could not download boot-binaries.tar.gz from release '$BINARIES_RELEASE'; required-file validation will report missing files."
-          fi
-          exit 0
+          archive="boot-binaries.tar.gz"
+          [[ -s "$archive" ]] || { echo "::error::Release asset is missing or empty: $archive"; exit 1; }
+          tar -tzf "$archive" >/dev/null || { echo "::error::Boot-binaries archive is not a valid gzip tar file."; exit 1; }
 
-      - name: Verify required binary components
-        shell: bash
-        run: |
-          required=(
+          expected=(
             "boot/vmlinuz"
             "boot/select.img"
             "EFI/BOOT/BOOTX64.EFI"
             "EFI/BOOT/grubx64.efi"
             "EFI/BOOT/mmx64.efi"
           )
-          missing=()
-          for file in "${required[@]}"; do
-            if [[ ! -f "$file" ]]; then
-              missing+=("$file")
+          for file in "${expected[@]}"; do
+            if ! tar -tzf "$archive" | grep -Fxq "$file"; then
+              echo "::error::Archive does not contain required path: $file"
+              exit 1
             fi
           done
 
-          if (( ${#missing[@]} > 0 )); then
-            echo "::error::Required boot binaries are missing. Commit or otherwise provide these files before running the image build:"
-            printf '  - %s\n' "${missing[@]}"
-            exit 1
-          fi
+          tar -xzf "$archive" -C .
+          for file in "${expected[@]}"; do
+            [[ -s "$file" ]] || { echo "::error::Extracted file is missing or empty: $file"; exit 1; }
+          done
 
       - name: Build SelectOS image
         run: sudo bash scripts/build-image.sh
+
+      - name: Verify image output
+        run: |
+          test -s dist/SelectOS.img
+          file dist/SelectOS.img
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4

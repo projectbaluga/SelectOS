@@ -2,15 +2,16 @@
 dist/
 *.img
 *.img.gz
+boot-binaries.tar.gz
 
-# Large binary components (required for build – see README)
+# Large binary components supplied through the boot-binaries release asset
 boot/vmlinuz
-boot/gate.img
+boot/select.img
 EFI/BOOT/BOOTX64.EFI
 EFI/BOOT/grubx64.efi
 EFI/BOOT/mmx64.efi
 
-# Keep the small config
+# Keep boot configuration tracked
 !EFI/BOOT/grub.cfg
 
 # OS junk
