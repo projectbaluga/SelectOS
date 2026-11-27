@@ -97,8 +97,8 @@ func (s *Server) createUser(w http.ResponseWriter,r *http.Request,c claims) {
 	var in userInput; if json.NewDecoder(http.MaxBytesReader(w,r.Body,4096)).Decode(&in)!=nil || !validUser(in.Username) || len(in.Password)<12 { write(w,400,response{"error":"username must be 3-32 safe characters; password must be at least 12 characters"});return }
 	if in.Role!="admin" {in.Role="user"}
 	h,err:=bcrypt.GenerateFromPassword([]byte(in.Password),bcrypt.DefaultCost);if err!=nil{write(w,500,response{"error":"hash failure"});return}
-	res,err:=s.db.Exec("INSERT INTO users(username,password_hash,role) VALUES($1,$2,$3)",in.Username,string(h),in.Role);if err!=nil{write(w,409,response{"error":"username already exists or database error"});return}
-	id,_:=res.LastInsertId();s.audit(in.Username,"user_created",r);write(w,201,response{"id":id,"username":in.Username,"role":in.Role})
+	var id int64;err=s.db.QueryRow("INSERT INTO users(username,password_hash,role) VALUES($1,$2,$3) RETURNING id",in.Username,string(h),in.Role).Scan(&id);if err!=nil{write(w,409,response{"error":"username already exists or database error"});return}
+	s.audit(in.Username,"user_created",r);write(w,201,response{"id":id,"username":in.Username,"role":in.Role})
 }
 func (s *Server) setUserStatus(w http.ResponseWriter,r *http.Request,c claims) {
 	id,err:=strconv.ParseInt(r.PathValue("id"),10,64);if err!=nil{write(w,400,response{"error":"invalid user id"});return}
