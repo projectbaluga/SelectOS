@@ -1,0 +1,14 @@
+# Build output
+dist/
+*.img
+*.img.gz
+
+# Binary components (extract from original image or download from releases)
+boot/vmlinuz
+boot/gate.img
+EFI/BOOT/*.efi
+!EFI/BOOT/grub.cfg
+
+# OS junk
+.DS_Store
+Thumbs.db
