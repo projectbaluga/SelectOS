@@ -1,0 +1,66 @@
+name: Build SelectOS Image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y parted dosfstools util-linux
+
+      - name: Check for required binary files
+        id: check
+        run: |
+          missing=0
+          for f in boot/vmlinuz boot/gate.img EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
+            if [ ! -f "$f" ]; then
+              echo "Missing: $f"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 1 ]; then
+            echo "status=missing" >> $GITHUB_OUTPUT
+            echo "⚠️  Required binary files are missing."
+            echo "The build will be skipped. Please add the binaries or provide them as artifacts."
+          else
+            echo "status=ready" >> $GITHUB_OUTPUT
+            echo "✅ All required binary files found."
+          fi
+
+      - name: Build SelectOS image
+        if: steps.check.outputs.status == 'ready'
+        run: |
+          chmod +x scripts/build-image.sh
+          ./scripts/build-image.sh
+
+      - name: Upload image artifact
+        if: steps.check.outputs.status == 'ready'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-image
+          path: dist/SelectOS.img
+          retention-days: 14
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.status }}" = "ready" ]; then
+            echo "### ✅ SelectOS image built successfully" >> $GITHUB_STEP_SUMMARY
+            echo "Download the artifact from the Actions run." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Build skipped" >> $GITHUB_STEP_SUMMARY
+            echo "Required binary files (vmlinuz, gate.img, EFI files) are not present in the repository." >> $GITHUB_STEP_SUMMARY
+            echo "Add them to the repo or supply them via a previous step to enable building." >> $GITHUB_STEP_SUMMARY
+          fi
