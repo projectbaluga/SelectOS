@@ -31,8 +31,8 @@ sudo --preserve-env=SELECTOS_PASSWORD ./selectos-auth-client offline-check --use
 unset SELECTOS_PASSWORD
 ```
 
-The cache expires after 72 hours and is refreshed only by a successful online login. This is a prototype: disabling an account or changing its password on the server cannot revoke an already-enrolled offline cache until it expires or the device reconnects. For production, shorten the lease to your policy, implement device enrollment/revocation and TPM-backed key protection where available, and enforce a TLS endpoint with a private CA. The current example API listens over HTTP, so do not use it over untrusted networks.
+The cache expires after 72 hours and is refreshed only by a successful online login. The client rejects unsafe cache-directory/key/cache-file permissions, validates cache timestamps and file types, writes cache updates atomically, limits request time, and refuses redirects so login credentials are not forwarded to another host. This is a prototype: disabling an account or changing its password on the server cannot revoke an already-enrolled offline cache until it expires or the device reconnects. For production, shorten the lease to your policy, implement device enrollment/revocation and TPM-backed key protection where available, and enforce a TLS endpoint with a private CA. The current example API listens over HTTP, so do not use it over untrusted networks.
 
-## Security model and limitations
+Run the client tests with `go test ./...` from this directory. They cover cache enrollment/verification, wrong credentials, expiry, unsafe key permissions, and invalid lifetimes.\n\n## Security model and limitations
 
 The local device key protects the cache at rest against casual file disclosure, but a root compromise can access it. Argon2id slows offline password guessing; it does not make weak passwords safe. This tool verifies credentials only. It does not start a desktop session, unlock encrypted disks, or replace the legacy Gbox UI. The prebuilt initramfs currently in the SelectOS repository has no source/build recipe here, so graphical integration requires rebuilding that runtime or supplying its source.
