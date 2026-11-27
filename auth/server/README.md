@@ -9,7 +9,8 @@ Go HTTP API for a Debian machine on the same LAN as SelectOS clients. The servic
 - Bootstrap first admin through environment variables.
 - Bearer tokens signed with an installation-specific HMAC key (8-hour expiry).
 - Admin endpoints to list/create/disable users and reset passwords.
-- Database-aware health endpoint and basic audit events.\n- Bearer tokens are checked against the current account status and role on every authenticated request, so disabling an account immediately blocks its existing tokens.
+- Database-aware health endpoint and basic audit events.
+- Bearer tokens are checked against the current account status and role on every authenticated request, so disabling an account immediately blocks its existing tokens.
 - No passwords are logged or returned by the API.
 
 ## Deploy on Debian with Docker Compose
@@ -17,7 +18,7 @@ Go HTTP API for a Debian machine on the same LAN as SelectOS clients. The servic
 Install Docker Engine and the Docker Compose plugin first. Then:
 
 ```sh
-git clone --branch feature/local-auth https://github.com/projectbaluga/SelectOS.git
+git clone https://github.com/projectbaluga/SelectOS.git
 cd SelectOS/auth/server
 cp .env.example .env
 ```
@@ -71,7 +72,7 @@ Do not run `docker compose down -v` unless you intentionally want to delete the 
 
 The API currently uses HTTP, not TLS. The health endpoint returns HTTP 503 when PostgreSQL cannot be reached. **Do not expose port 8088 to the public internet or an untrusted network.** For production, put the API behind TLS (for example, a private-CA reverse proxy), restrict inbound access with the Debian firewall to the client LAN, and use unique strong secrets. The PostgreSQL port is intentionally internal to the Compose network.
 
-A production rollout still needs rate limiting/lockout, secure device enrollment and revocation, tested backup/restore, and monitoring. The offline login cache is not yet integrated into this server milestone. The existing Gate initramfs is a prebuilt binary with no source in this repository, so this API does not yet replace its Gbox login screen; a client/login component and initramfs integration are still required.
+A production rollout still needs rate limiting/lockout, secure device enrollment and revocation, tested backup/restore, and monitoring. The offline cache is implemented in the CLI client, and a console Gate hook is provided under `auth/gate/`, but neither is integrated into the shipped graphical login/runtime. The existing Gate initramfs is a prebuilt binary without a complete source/build recipe in this repository. See [the integration contract](../gate/README.md).
 
 ## API
 
