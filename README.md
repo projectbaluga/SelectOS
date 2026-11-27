@@ -4,72 +4,40 @@ Lightweight UEFI multi-boot selector, rebranded from the supplied legacy Gate im
 
 SelectOS boots a minimal Linux environment, detects installed operating systems, and presents a configurable menu for choosing an OS.
 
-> **Build status:** the original image supplied for this project contains a real Linux kernel, Gate initramfs, and UEFI binaries. These have been extracted into the correctly named SelectOS build archive. The legacy initramfs remains a prebuilt binary; its original source/build recipe is not present in this repository.
+> **Build status:** the original compressed disk image, `gate-test.img.gz`, is stored in this repository. GitHub Actions extracts the required boot files from it automatically before building the SelectOS image. The legacy initramfs remains a prebuilt binary; its original source/build recipe is not present in this repository.
 
 ## Boot components
 
-The image builder expects these files:
+The workflow extracts these files from the committed source image:
 
-| Required path | Purpose |
-|---|---|
-| `boot/vmlinuz` | Linux kernel (from the supplied legacy image) |
-| `boot/select.img` | Legacy Gate initramfs, renamed for the SelectOS build layout |
-| `EFI/BOOT/BOOTX64.EFI` | UEFI removable-media boot manager |
-| `EFI/BOOT/grubx64.efi` | GRUB EFI executable |
-| `EFI/BOOT/mmx64.efi` | MokManager executable |
+| Output path | Source path | Purpose |
+|---|---|---|
+| `boot/vmlinuz` | `BOOT/VMLINUZ` | Linux kernel |
+| `boot/select.img` | `BOOT/GATE.IMG` | Legacy Gate initramfs, renamed for SelectOS layout |
+| `EFI/BOOT/BOOTX64.EFI` | `EFI/BOOT/BOOTX64.EFI` | UEFI removable-media boot manager |
+| `EFI/BOOT/grubx64.efi` | `EFI/BOOT/GRUBX64.EFI` | GRUB EFI executable |
+| `EFI/BOOT/mmx64.efi` | `EFI/BOOT/MMX64.EFI` | MokManager executable |
 
-The archive `boot-binaries.tar.gz` is prepared from the user-supplied `gate-test.img.gz`. Its five paths match the workflow's required archive layout. The archive must be attached to a GitHub Release as an asset named exactly `boot-binaries.tar.gz` before the cloud build can download it.
+No release asset or separate boot-binaries archive is required. Keep `gate-test.img.gz` in the repository root.
 
 ## Legacy runtime compatibility
 
-The original initramfs is still the Gate runtime binary. Inspection confirms that it expects the on-image configuration file `/gate.json` and the marker file `/gate.marker`. Therefore the builder deliberately copies `config/select.json` to `gate.json` and creates `gate.marker`, while the user-facing branding and GRUB menu use SelectOS. Do not rename these two internal runtime paths unless the initramfs itself is rebuilt and tested.
+The original initramfs is still the Gate runtime binary. It expects the on-image configuration file `/gate.json` and marker file `/gate.marker`. The builder therefore copies `config/select.json` to `gate.json` and creates `gate.marker`, while the user-facing branding and GRUB menu use SelectOS. Do not rename these internal compatibility paths unless the initramfs itself is rebuilt and tested.
 
 The original initramfs also contains the legacy Gate application binary. The visible branding is supplied through `config/select.json`; this does not recompile or rename the internal program.
-
-## Prepare or update the boot-binaries release
-
-The prepared archive must contain these exact relative paths, with no enclosing directory:
-
-```text
-boot/vmlinuz
-boot/select.img
-EFI/BOOT/BOOTX64.EFI
-EFI/BOOT/grubx64.efi
-EFI/BOOT/mmx64.efi
-```
-
-Attach the prepared `boot-binaries.tar.gz` file to a GitHub Release in this repository and name the release asset exactly `boot-binaries.tar.gz`. The workflow input `binaries_release` must be `latest` or the exact release tag.
-
-For future maintainers who have the extracted files available locally:
-
-```bash
-tar -czf boot-binaries.tar.gz boot/vmlinuz boot/select.img \
-  EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi
-tar -tzf boot-binaries.tar.gz
-gh release create binaries boot-binaries.tar.gz --repo projectbaluga/SelectOS
-```
-
-To replace the asset on an existing release:
-
-```bash
-gh release upload binaries boot-binaries.tar.gz \
-  --repo projectbaluga/SelectOS --clobber
-```
 
 ## Build with GitHub Actions
 
 1. Open **Actions** in this repository.
 2. Select **Build SelectOS image**.
-3. Choose **Run workflow**.
-4. Set `binaries_release` to `latest` or the exact tag containing `boot-binaries.tar.gz`.
-5. Run the workflow and inspect its logs.
-6. If successful, download the `SelectOS-image` artifact.
+3. Click **Run workflow**.
+4. Run the workflow on the `main` branch.
 
-The workflow validates the archive and all required files before invoking the image builder. A missing release, missing archive member, corrupt archive, or empty file stops the job with an explicit error.
+The workflow checks and decompresses `gate-test.img.gz`, mounts its partition, extracts the five boot files, and runs the image builder. On success, it uploads an artifact named **SelectOS-image** containing `SelectOS.img` (retained for 14 days).
 
 ## Build locally
 
-On an Ubuntu/Debian system with the required binaries in place:
+On an Ubuntu/Debian system, decompress and mount the source image, then place the five extracted files in the paths listed above. Install the build dependencies and run:
 
 ```bash
 sudo apt-get update
@@ -98,6 +66,7 @@ Edit `config/select.json` to change SelectOS branding and operating-system prese
 ```text
 SelectOS/
 ├── .github/workflows/build-image.yml
+├── gate-test.img.gz
 ├── config/select.json
 ├── boot/grub/grub.cfg
 ├── EFI/BOOT/grub.cfg
