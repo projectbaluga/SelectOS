@@ -38,6 +38,6 @@ jobs:
       - name: Build client
         working-directory: auth/client
         run: |
-          go mod download
+          go mod tidy
           go test ./...
           go build -o /tmp/selectos-auth-client .
