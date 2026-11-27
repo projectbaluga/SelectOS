@@ -1,15 +1,17 @@
-name: Test SelectOS auth server
+name: Test SelectOS auth server and client
 
 on:
   push:
     paths:
       - "auth/server/**"
       - "auth/client/**"
+      - "auth/gate/**"
       - ".github/workflows/auth-server.yml"
   pull_request:
     paths:
       - "auth/server/**"
       - "auth/client/**"
+      - "auth/gate/**"
       - ".github/workflows/auth-server.yml"
   workflow_dispatch:
 
@@ -24,7 +26,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
-          cache-dependency-path: auth/server/go.sum
+          cache-dependency-path: |
+            auth/server/go.sum
+            auth/client/go.sum
       - name: Resolve and verify dependencies
         working-directory: auth/server
         run: go mod tidy
@@ -42,4 +46,6 @@ jobs:
           go mod tidy
           go vet ./...
           go test ./...
-          go build -o /tmp/selectos-auth-client .
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/selectos-auth-client .
+      - name: Validate Gate hook shell syntax
+        run: sh -n auth/gate/selectos-gate-auth.sh
