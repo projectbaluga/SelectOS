@@ -54,17 +54,30 @@ func main() {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS users (
-		id BIGSERIAL PRIMARY KEY, username TEXT NOT NULL,
-		password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user',
-		enabled BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE TABLE IF NOT EXISTS audit (
-		id BIGSERIAL PRIMARY KEY, username TEXT NOT NULL, event TEXT NOT NULL,
-		remote_ip TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-	 );
-	CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username));`)
-	return err
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS users (
+			id BIGSERIAL PRIMARY KEY,
+			username TEXT NOT NULL,
+			password_hash TEXT NOT NULL,
+			role TEXT NOT NULL DEFAULT 'user',
+			enabled BOOLEAN NOT NULL DEFAULT TRUE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS audit (
+			id BIGSERIAL PRIMARY KEY,
+			username TEXT NOT NULL,
+			event TEXT NOT NULL,
+			remote_ip TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username))`,
+	}
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (s *Server) bootstrapAdmin() error {
 	u, p := os.Getenv("SELECTOS_ADMIN_USER"), os.Getenv("SELECTOS_ADMIN_PASSWORD")
