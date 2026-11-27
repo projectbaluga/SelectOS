@@ -88,7 +88,7 @@ A production rollout still needs rate limiting/lockout, secure device enrollment
 Requires Go 1.23+ and a reachable PostgreSQL instance. Set `SELECTOS_DATABASE_URL`, `SELECTOS_AUTH_TOKEN_KEY`, and admin bootstrap variables, then:
 
 ```sh
-go mod download
+go mod tidy
 go test ./...
 go build -o selectos-auth .
 ```
