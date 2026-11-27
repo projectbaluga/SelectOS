@@ -1,0 +1,15 @@
+{
+  "_help": "Edit with Notepad. Save as plain text. New operating systems appear on their own; add a rule below only to rename, reorder, hide, or give an OS its own icon.",
+
+  "brand":  { "name": "SelectOS", "subtitle": "Multi-boot Selector" },
+  "domain": "",
+
+  "default": "",
+  "hide": [],
+  "show_all_entries": false,
+
+  "os": [
+    { "match": "windows", "name": "Windows 11", "subtitle": "Microsoft Windows", "order": 1 },
+    { "match": "ubuntu",  "name": "Ubuntu",     "subtitle": "Ubuntu Linux",      "order": 2 }
+  ]
+}
