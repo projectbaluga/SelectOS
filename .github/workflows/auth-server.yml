@@ -26,8 +26,14 @@ jobs:
       - name: Download dependencies
         working-directory: auth/server
         run: go mod download
-      - name: Build and test
+      - name: Build server
         working-directory: auth/server
         run: |
           go test ./...
           go build -o /tmp/selectos-auth .
+      - name: Build client
+        working-directory: auth/client
+        run: |
+          go mod download
+          go test ./...
+          go build -o /tmp/selectos-auth-client .
