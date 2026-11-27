@@ -123,7 +123,7 @@ func VerifyOfflineCache(dir, username, password string) (string, error) {
 	if err = json.Unmarshal(plain, &record); err != nil { return "", errors.New("corrupt offline cache record") }
 	if record.Username != strings.TrimSpace(username) { return "", errors.New("username does not match this device cache") }
 	now := time.Now().Unix()
-	if record.CreatedAt <= 0 || record.ExpiresAt <= record.CreatedAt || record.ExpiresAt-record.CreatedAt > int64(maxCacheLifetime.Seconds()) || now > record.ExpiresAt {
+	if record.CreatedAt <= 0 || record.ExpiresAt <= record.CreatedAt || record.ExpiresAt-record.CreatedAt > int64(maxCacheLifetime.Seconds()) || now >= record.ExpiresAt {
 		return "", errors.New("offline cache expired or has invalid timestamps; reconnect to the LAN server")
 	}
 	if len(record.Salt) != 16 || len(record.Verifier) != 32 { return "", fmt.Errorf("invalid offline verifier") }
