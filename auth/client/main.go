@@ -107,7 +107,7 @@ func offlineCheck(args []string) {
 	fmt.Printf("Offline login accepted: %s (%s). Server policy changes may not be known until reconnect.\n", *username, role)
 }
 func defaultCacheDir() string {
-	if v := os.Getenv("SELECTOS_AUTH_CACHE); v != "" { return v }
+	if v := os.Getenv("SELECTOS_AUTH_CACHE"); v != "" { return v }
 	return "/var/lib/selectos-auth-client"
 }
 func fatal(err error) { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
