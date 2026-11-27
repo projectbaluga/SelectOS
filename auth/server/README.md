@@ -17,7 +17,7 @@ Go HTTP API for a Debian machine on the same LAN as SelectOS clients. The servic
 Install Docker Engine and the Docker Compose plugin first. Then:
 
 ```sh
-git clone https://github.com/projectbaluga/SelectOS.git
+git clone --branch feature/local-auth https://github.com/projectbaluga/SelectOS.git
 cd SelectOS/auth/server
 cp .env.example .env
 ```
