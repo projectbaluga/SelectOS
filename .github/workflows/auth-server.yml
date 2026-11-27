@@ -31,6 +31,7 @@ jobs:
       - name: Build server
         working-directory: auth/server
         run: |
+          go vet ./...
           go test ./...
           go build -o /tmp/selectos-auth .
       - name: Build server Docker image
@@ -39,5 +40,6 @@ jobs:
         working-directory: auth/client
         run: |
           go mod tidy
+          go vet ./...
           go test ./...
           go build -o /tmp/selectos-auth-client .
