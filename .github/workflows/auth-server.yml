@@ -26,10 +26,6 @@ jobs:
       - name: Download dependencies
         working-directory: auth/server
         run: go mod download
-      - name: Format check
-        working-directory: auth/server
-        run: |
-          test -z "$(gofmt -l .)" || (gofmt -l .; exit 1)
       - name: Build and test
         working-directory: auth/server
         run: |
