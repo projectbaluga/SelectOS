@@ -1,44 +1,77 @@
 # SelectOS Local Authentication Server
 
-Go HTTP API for a Debian machine on the same LAN as SelectOS clients. It does not depend on an internet identity provider.
+Go HTTP API for a Debian machine on the same LAN as SelectOS clients. The service uses PostgreSQL and Docker Compose; it does not depend on an internet identity provider.
 
-## Current scope
+## Stack and current scope
 
-- SQLite user database; bcrypt password hashes.
+- PostgreSQL 17 database with persistent Docker volume.
+- bcrypt password hashes and case-insensitive unique usernames.
 - Bootstrap first admin through environment variables.
 - Bearer tokens signed with an installation-specific HMAC key (8-hour expiry).
 - Admin endpoints to list/create/disable users and reset passwords.
 - Health endpoint and basic audit events.
 - No passwords are logged or returned by the API.
 
-## Important security/deployment notes
+## Deploy on Debian with Docker Compose
 
-This first server implementation is HTTP-only and is intended for a trusted isolated LAN during development. **Do not expose port 8088 to the public internet or an untrusted network.** Before production deployment, put it behind TLS (for example, a private-CA reverse proxy), restrict inbound access with the Debian firewall, and provision a unique random token key. A production rollout also needs rate limiting/lockout, CSRF protection if a browser admin UI is added, backup/restore, and device enrollment.
-
-The offline login cache is deliberately not enabled in this server-only milestone. A safe cache requires device enrollment and a per-device encryption key protected by the client OS; do not store reusable password hashes in a shared boot image. The existing Gate initramfs is a prebuilt binary with no source in this repository, so this API cannot replace its Gbox screen until a new client/login component is built and integrated into the initramfs.
-
-## Build
-
-Requires Go 1.23+ and network access once to download modules:
+Install Docker Engine and the Docker Compose plugin first. Then:
 
 ```sh
-cd auth/server
-go mod download
-go build -o selectos-auth .
+git clone https://github.com/projectbaluga/SelectOS.git
+cd SelectOS/auth/server
+cp .env.example .env
 ```
 
-## Run manually
+Generate unique secrets and edit `.env` (keep it private):
 
 ```sh
-install -d -m 700 data
-export SELECTOS_AUTH_TOKEN_KEY="$(openssl rand -hex 32)"
-export SELECTOS_ADMIN_USER="admin"
-read -rsp "Initial admin password: " SELECTOS_ADMIN_PASSWORD; echo
-export SELECTOS_ADMIN_PASSWORD
-./selectos-auth
+openssl rand -hex 32
+openssl rand -hex 32
+chmod 600 .env
+nano .env
 ```
 
-Listen address defaults to `0.0.0.0:8088`; set `SELECTOS_AUTH_ADDR` to change it. Database defaults to `./data/selectos-auth.db`.
+Use the first generated value for `SELECTOS_DB_PASSWORD`, the second for `SELECTOS_AUTH_TOKEN_KEY`, and set a unique `SELECTOS_ADMIN_PASSWORD` of at least 12 characters. Do not commit or share `.env`.
+
+Start the stack:
+
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose logs -f auth
+```
+
+The API listens on TCP port 8088 by default. Clients on the same LAN can use `http://SERVER-LAN-IP:8088` during isolated-LAN testing. PostgreSQL is not published to the host network; only the API port is exposed. Change the port with `SELECTOS_AUTH_PORT`.
+
+Check health:
+
+```sh
+curl http://127.0.0.1:8088/healthz
+```
+
+## Data persistence and backup
+
+PostgreSQL data is stored in the named Docker volume `selectos-postgres`, so recreating the containers does not remove the database.
+
+Create a backup:
+
+```sh
+docker compose exec -T postgres pg_dump -U selectos selectos > selectos-backup.sql
+```
+
+Restore into an empty database:
+
+```sh
+cat selectos-backup.sql | docker compose exec -T postgres psql -U selectos -d selectos
+```
+
+Do not run `docker compose down -v` unless you intentionally want to delete the database volume.
+
+## Security notes
+
+The API currently uses HTTP, not TLS. **Do not expose port 8088 to the public internet or an untrusted network.** For production, put the API behind TLS (for example, a private-CA reverse proxy), restrict inbound access with the Debian firewall to the client LAN, and use unique strong secrets. The PostgreSQL port is intentionally internal to the Compose network.
+
+A production rollout still needs rate limiting/lockout, secure device enrollment and revocation, tested backup/restore, and monitoring. The offline login cache is not yet integrated into this server milestone. The existing Gate initramfs is a prebuilt binary with no source in this repository, so this API does not yet replace its Gbox login screen; a client/login component and initramfs integration are still required.
 
 ## API
 
@@ -50,6 +83,12 @@ Listen address defaults to `0.0.0.0:8088`; set `SELECTOS_AUTH_ADDR` to change it
 - Admin: `PATCH /v1/admin/users/{id}/status` JSON `{"enabled":false}`
 - Admin: `POST /v1/admin/users/{id}/password` JSON `{"password":"new long password"}`
 
-## Debian service
+## Local build (optional)
 
-Review and adapt `systemd/selectos-auth.service`. Create a dedicated system user, install the binary at `/opt/selectos-auth/selectos-auth`, and put environment values in root-owned `/etc/selectos-auth.env` (mode 0600). The service unit uses `/var/lib/selectos-auth` for state; set `SELECTOS_AUTH_DB=/var/lib/selectos-auth/selectos-auth.db`.
+Requires Go 1.23+ and a reachable PostgreSQL instance. Set `SELECTOS_DATABASE_URL`, `SELECTOS_AUTH_TOKEN_KEY`, and admin bootstrap variables, then:
+
+```sh
+go mod download
+go test ./...
+go build -o selectos-auth .
+```
