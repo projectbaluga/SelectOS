@@ -1,0 +1,37 @@
+name: Test SelectOS auth server
+
+on:
+  push:
+    paths:
+      - "auth/server/**"
+      - ".github/workflows/auth-server.yml"
+  pull_request:
+    paths:
+      - "auth/server/**"
+      - ".github/workflows/auth-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+          cache-dependency-path: auth/server/go.sum
+      - name: Download dependencies
+        working-directory: auth/server
+        run: go mod download
+      - name: Format check
+        working-directory: auth/server
+        run: |
+          test -z "$(gofmt -l .)" || (gofmt -l .; exit 1)
+      - name: Build and test
+        working-directory: auth/server
+        run: |
+          go test ./...
+          go build -o /tmp/selectos-auth .
