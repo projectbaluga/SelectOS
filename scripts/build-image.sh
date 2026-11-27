@@ -78,9 +78,10 @@ cp "${ROOT}/EFI/BOOT/grub.cfg"      "${MNT}/EFI/BOOT/"
 cp "${ROOT}/boot/vmlinuz"           "${MNT}/boot/"
 cp "${ROOT}/boot/select.img"        "${MNT}/boot/"
 cp "${ROOT}/boot/grub/grub.cfg"     "${MNT}/boot/grub/"
-# The initramfs binary is not present in the repository, so its config path
-# cannot yet be verified. Keep the legacy on-image /gate.json path until the
-# compiled /init is rebuilt or inspected to confirm it reads /select.json.
+# Runtime-path assumption: the original initramfs and compiled Go /init are
+# not available in this repository, so the expected config filename cannot
+# be verified. Preserve the legacy on-image /gate.json path for compatibility;
+# config/select.json is the source filename used by the SelectOS project.
 cp "${ROOT}/config/select.json"     "${MNT}/gate.json"
 cp "${ROOT}/icons/"*                "${MNT}/icons/" 2>/dev/null || true
 touch "${MNT}/select.marker"
