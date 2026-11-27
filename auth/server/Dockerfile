@@ -4,6 +4,7 @@ RUN apk add --no-cache git
 COPY go.mod ./
 RUN go mod download
 COPY . .
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/selectos-auth .
 
 FROM alpine:3.21
