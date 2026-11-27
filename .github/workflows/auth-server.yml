@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "auth/server/**"
+      - "auth/client/**"
       - ".github/workflows/auth-server.yml"
   pull_request:
     paths:
