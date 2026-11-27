@@ -2,12 +2,6 @@ name: Build SelectOS image
 
 on:
   workflow_dispatch:
-    inputs:
-      binaries_release:
-        description: "Release tag containing boot-binaries.tar.gz (latest or an exact tag)"
-        required: false
-        type: string
-        default: latest
 
 permissions:
   contents: read
@@ -23,44 +17,57 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y parted dosfstools util-linux
+          sudo apt-get install -y parted dosfstools util-linux gzip
 
-      - name: Download and validate boot binaries
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BINARIES_RELEASE: ${{ inputs.binaries_release }}
+      - name: Extract boot files from repository image
         shell: bash
         run: |
           set -Eeuo pipefail
 
-          args=(--repo "$GITHUB_REPOSITORY" --pattern boot-binaries.tar.gz --dir .)
-          if [[ "$BINARIES_RELEASE" == "latest" || -z "$BINARIES_RELEASE" ]]; then
-            gh release download "${args[@]}"
-          else
-            gh release download "$BINARIES_RELEASE" "${args[@]}"
-          fi
+          SOURCE="gate-test.img.gz"
+          [[ -s "$SOURCE" ]] || { echo "::error::Missing repository source image: $SOURCE"; exit 1; }
+          gzip -t "$SOURCE"
 
-          archive="boot-binaries.tar.gz"
-          [[ -s "$archive" ]] || { echo "::error::Release asset is missing or empty: $archive"; exit 1; }
-          tar -tzf "$archive" >/dev/null || { echo "::error::Boot-binaries archive is not a valid gzip tar file."; exit 1; }
-
-          expected=(
-            "boot/vmlinuz"
-            "boot/select.img"
-            "EFI/BOOT/BOOTX64.EFI"
-            "EFI/BOOT/grubx64.efi"
-            "EFI/BOOT/mmx64.efi"
-          )
-          for file in "${expected[@]}"; do
-            if ! tar -tzf "$archive" | grep -Fxq "$file"; then
-              echo "::error::Archive does not contain required path: $file"
-              exit 1
+          WORK="$(mktemp -d)"
+          LOOP=""
+          cleanup() {
+            if [[ -n "$LOOP" ]]; then
+              sudo umount "$WORK/source" 2>/dev/null || true
+              sudo losetup -d "$LOOP" 2>/dev/null || true
             fi
-          done
+            rm -rf "$WORK"
+          }
+          trap cleanup EXIT
 
-          tar -xzf "$archive" -C .
-          for file in "${expected[@]}"; do
-            [[ -s "$file" ]] || { echo "::error::Extracted file is missing or empty: $file"; exit 1; }
+          mkdir -p "$WORK/source"
+          gzip -dc "$SOURCE" > "$WORK/source.img"
+          LOOP="$(sudo losetup --find --show --partscan "$WORK/source.img")"
+
+          PART="${LOOP}p1"
+          for attempt in {1..10}; do
+            [[ -b "$PART" ]] && break
+            sleep 1
+          done
+          [[ -b "$PART" ]] || { echo "::error::Could not find source image partition $PART"; exit 1; }
+
+          sudo mount -o ro "$PART" "$WORK/source"
+
+          mkdir -p boot EFI/BOOT
+          sudo test -s "$WORK/source/BOOT/VMLINUZ"
+          sudo test -s "$WORK/source/BOOT/GATE.IMG"
+          sudo test -s "$WORK/source/EFI/BOOT/BOOTX64.EFI"
+          sudo test -s "$WORK/source/EFI/BOOT/GRUBX64.EFI"
+          sudo test -s "$WORK/source/EFI/BOOT/MMX64.EFI"
+
+          sudo cp "$WORK/source/BOOT/VMLINUZ" boot/vmlinuz
+          sudo cp "$WORK/source/BOOT/GATE.IMG" boot/select.img
+          sudo cp "$WORK/source/EFI/BOOT/BOOTX64.EFI" EFI/BOOT/BOOTX64.EFI
+          sudo cp "$WORK/source/EFI/BOOT/GRUBX64.EFI" EFI/BOOT/grubx64.efi
+          sudo cp "$WORK/source/EFI/BOOT/MMX64.EFI" EFI/BOOT/mmx64.efi
+          sudo chown -R "$USER:$USER" boot EFI
+
+          for file in boot/vmlinuz boot/select.img EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
+            [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
       - name: Build SelectOS image
