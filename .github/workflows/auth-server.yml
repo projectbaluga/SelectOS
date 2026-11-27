@@ -23,9 +23,9 @@ jobs:
         with:
           go-version: "1.23.x"
           cache-dependency-path: auth/server/go.sum
-      - name: Download dependencies
+      - name: Resolve and verify dependencies
         working-directory: auth/server
-        run: go mod download
+        run: go mod tidy
       - name: Build server
         working-directory: auth/server
         run: |
