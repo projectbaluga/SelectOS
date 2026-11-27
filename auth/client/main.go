@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -49,4 +48,3 @@ func offlineCheck(args []string){
 }
 func defaultCacheDir()string{if v:=os.Getenv("SELECTOS_AUTH_CACHE");v!=""{return v};return "/var/lib/selectos-auth-client"}
 func fatal(err error){fmt.Fprintln(os.Stderr,err);os.Exit(1)}
-func init(){_ = filepath.Separator}
