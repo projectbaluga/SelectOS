@@ -1,0 +1,54 @@
+name: Build SelectOS image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build bootable image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y parted dosfstools util-linux
+
+      - name: Verify required binary components
+        shell: bash
+        run: |
+          required=(
+            "boot/vmlinuz"
+            "boot/select.img"
+            "EFI/BOOT/BOOTX64.EFI"
+            "EFI/BOOT/grubx64.efi"
+            "EFI/BOOT/mmx64.efi"
+          )
+          missing=()
+          for file in "${required[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              missing+=("$file")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Required boot binaries are missing. Commit or otherwise provide these files before running the image build:"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - name: Build SelectOS image
+        run: sudo bash scripts/build-image.sh
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-image
+          path: dist/SelectOS.img
+          if-no-files-found: error
+          retention-days: 14

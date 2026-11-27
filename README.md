@@ -45,6 +45,10 @@ cp /mnt/EFI/BOOT/*.efi        EFI/BOOT/
 
 This creates `dist/SelectOS.img` (512 MB FAT32 UEFI image).
 
+## Building via GitHub Actions
+
+For a manual cloud build, open **Actions → Build SelectOS image → Run workflow**, then download the `SelectOS.img` artifact from the completed run. This workflow runs only when manually triggered. The required kernel, initramfs, and EFI binaries must already be present in the repository; otherwise, the workflow stops with a clear error. The local build above remains the primary path.
+
 ## Write to USB
 
 ```bash
