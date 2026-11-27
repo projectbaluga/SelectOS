@@ -18,21 +18,21 @@ You need these binary components (not included in the git repository because of 
 | File                    | Description                     | Approx size |
 |-------------------------|---------------------------------|-------------|
 | `boot/vmlinuz`          | Linux kernel                    | ~15 MB      |
-| `boot/gate.img`         | Initramfs (contains the Go init)| ~2.2 MB     |
+| `boot/select.img`       | Initramfs (contains the Go init)| ~2.2 MB     |
 | `EFI/BOOT/BOOTX64.EFI`  | UEFI bootloader                 | ~1 MB       |
 | `EFI/BOOT/grubx64.efi`  | GRUB EFI                        | ~2.6 MB     |
 | `EFI/BOOT/mmx64.efi`    | MokManager (Secure Boot)        | ~0.8 MB     |
 
-These can be extracted from the original `gate-test.img`:
+These can be extracted from the original `select-test.img`:
 
 ```bash
-gunzip -c gate-test.img.gz > gate-test.img
-sudo losetup -fP --show gate-test.img   # note the loop device
+gunzip -c select-test.img.gz > select-test.img
+sudo losetup -fP --show select-test.img   # note the loop device
 sudo mount /dev/loopXp1 /mnt
 
 mkdir -p boot EFI/BOOT
 cp /mnt/boot/vmlinuz          boot/
-cp /mnt/boot/gate.img         boot/
+cp /mnt/boot/select.img       boot/
 cp /mnt/EFI/BOOT/*.efi        EFI/BOOT/
 ```
 
@@ -55,7 +55,7 @@ sudo dd if=dist/SelectOS.img of=/dev/sdX bs=4M status=progress oflag=sync
 
 ## Configuration
 
-Edit `config/gate.json`:
+Edit `config/select.json`:
 
 ```json
 {
@@ -74,12 +74,13 @@ Edit `config/gate.json`:
 
 ```
 SelectOS/
-├── config/gate.json          ← main configuration
-├── boot/grub/grub.cfg        ← GRUB menu
-├── EFI/BOOT/grub.cfg         ← EFI chainloader
-├── scripts/build-image.sh    ← image builder
-├── icons/                    ← optional icons
-└── src/                      ← future Go source
+├── config/select.json       ← main configuration
+├── boot/select.img          ← initramfs (provided before build)
+├── boot/grub/grub.cfg       ← GRUB menu
+├── EFI/BOOT/grub.cfg        ← EFI chainloader
+├── scripts/build-image.sh   ← image builder
+├── icons/                   ← optional icons
+└── src/                     ← future Go source
 ```
 
 ## License
