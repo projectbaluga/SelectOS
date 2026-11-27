@@ -18,7 +18,7 @@ echo "==> SelectOS image builder"
 missing=0
 for f in \
   "boot/vmlinuz" \
-  "boot/gate.img" \
+  "boot/select.img" \
   "EFI/BOOT/BOOTX64.EFI" \
   "EFI/BOOT/grubx64.efi" \
   "EFI/BOOT/mmx64.efi"
@@ -76,11 +76,14 @@ cp "${ROOT}/EFI/BOOT/grubx64.efi"   "${MNT}/EFI/BOOT/"
 cp "${ROOT}/EFI/BOOT/mmx64.efi"     "${MNT}/EFI/BOOT/"
 cp "${ROOT}/EFI/BOOT/grub.cfg"      "${MNT}/EFI/BOOT/"
 cp "${ROOT}/boot/vmlinuz"           "${MNT}/boot/"
-cp "${ROOT}/boot/gate.img"          "${MNT}/boot/"
+cp "${ROOT}/boot/select.img"        "${MNT}/boot/"
 cp "${ROOT}/boot/grub/grub.cfg"     "${MNT}/boot/grub/"
-cp "${ROOT}/config/gate.json"       "${MNT}/"
+# The initramfs binary is not present in the repository, so its config path
+# cannot yet be verified. Keep the legacy on-image /gate.json path until the
+# compiled /init is rebuilt or inspected to confirm it reads /select.json.
+cp "${ROOT}/config/select.json"     "${MNT}/gate.json"
 cp "${ROOT}/icons/"*                "${MNT}/icons/" 2>/dev/null || true
-touch "${MNT}/gate.marker"
+touch "${MNT}/select.marker"
 
 sync
 umount "${MNT}"
