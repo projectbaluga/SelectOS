@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - "auth/server/**"
+      - "auth/client/**"
       - ".github/workflows/auth-server.yml"
   workflow_dispatch:
 
