@@ -1,84 +1,88 @@
 # SelectOS
 
-A lightweight UEFI-bootable multi-boot selector.
+Lightweight UEFI multi-boot selector.
 
-SelectOS boots a minimal Linux environment that detects installed operating systems and presents a clean, configurable menu so users can choose which OS to start.
+SelectOS boots a minimal Linux environment, detects installed operating systems, and presents a clean configurable menu so the user can choose which OS to start.
 
 ## Features
 
-- UEFI boot (with Secure Boot / MokManager support)
-- Simple JSON-based branding and OS presentation rules
-- Very small initramfs (BusyBox + storage drivers + custom Go binary)
-- Designed for multi-boot machines and lab environments
+- Full UEFI support (including Secure Boot / MokManager)
+- Simple JSON configuration for branding and OS presentation
+- Tiny initramfs (BusyBox + essential drivers + custom Go binary)
+- Easy to rebuild and deploy to USB
 
-## Project layout
+## Requirements to build
 
-```
-SelectOS/
-├── README.md
-├── config/
-│   └── gate.json          # Branding & OS display rules (edit this)
-├── boot/
-│   ├── vmlinuz            # Linux kernel
-│   ├── gate.img           # Initramfs containing the Go "init"
-│   └── grub/
-│       └── grub.cfg
-├── EFI/BOOT/
-│   ├── BOOTX64.EFI
-│   ├── grubx64.efi
-│   ├── mmx64.efi
-│   └── grub.cfg
-├── icons/
-├── scripts/
-│   └── build-image.sh     # Rebuilds the bootable .img
-└── src/                   # Future source of the init binary
-```
+You need these binary components (not included in the git repository because of size):
 
-## Quick rebuild
+| File                    | Description                     | Approx size |
+|-------------------------|---------------------------------|-------------|
+| `boot/vmlinuz`          | Linux kernel                    | ~15 MB      |
+| `boot/gate.img`         | Initramfs (contains the Go init)| ~2.2 MB     |
+| `EFI/BOOT/BOOTX64.EFI`  | UEFI bootloader                 | ~1 MB       |
+| `EFI/BOOT/grubx64.efi`  | GRUB EFI                        | ~2.6 MB     |
+| `EFI/BOOT/mmx64.efi`    | MokManager (Secure Boot)        | ~0.8 MB     |
 
-1. Place the binary components into the tree:
-   - `boot/vmlinuz`
-   - `boot/gate.img`
-   - `EFI/BOOT/*.efi`
-
-2. Run:
-```bash
-./scripts/build-image.sh
-```
-
-This produces `dist/SelectOS.img` (512 MiB FAT32 image).
-
-### Obtaining the binary components
-
-Extract them from the original image:
+These can be extracted from the original `gate-test.img`:
 
 ```bash
 gunzip -c gate-test.img.gz > gate-test.img
-sudo losetup -fP gate-test.img
+sudo losetup -fP --show gate-test.img   # note the loop device
 sudo mount /dev/loopXp1 /mnt
-cp /mnt/boot/vmlinuz boot/
-cp /mnt/boot/gate.img boot/
-cp /mnt/EFI/BOOT/*.efi EFI/BOOT/
+
+mkdir -p boot EFI/BOOT
+cp /mnt/boot/vmlinuz          boot/
+cp /mnt/boot/gate.img         boot/
+cp /mnt/EFI/BOOT/*.efi        EFI/BOOT/
 ```
 
-## Configuration
+## Quick build
 
-Edit `config/gate.json`:
+```bash
+# Make sure the binary files above are in place, then:
+./scripts/build-image.sh
+```
 
-- `brand` – name and subtitle shown in the UI
-- `os` – rules to rename, reorder, or assign icons to detected operating systems
-- `hide` – patterns to hide
-- `default` – default selected entry
+This creates `dist/SelectOS.img` (512 MB FAT32 UEFI image).
 
-## Writing the image
+## Write to USB
 
 ```bash
 sudo dd if=dist/SelectOS.img of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
-**Double-check the target device!**
+**Warning:** Double-check the target device (`/dev/sdX`). This will erase everything on it.
+
+## Configuration
+
+Edit `config/gate.json`:
+
+```json
+{
+  "brand": { "name": "SelectOS", "subtitle": "Multi-boot Selector" },
+  "os": [
+    { "match": "windows", "name": "Windows 11", "subtitle": "Microsoft Windows", "order": 1 },
+    { "match": "ubuntu",  "name": "Ubuntu",     "subtitle": "Ubuntu Linux",      "order": 2 }
+  ]
+}
+```
+
+- New operating systems appear automatically.
+- Only add rules when you want to rename, reorder, hide, or assign a custom icon.
+
+## Project structure
+
+```
+SelectOS/
+├── config/gate.json          ← main configuration
+├── boot/grub/grub.cfg        ← GRUB menu
+├── EFI/BOOT/grub.cfg         ← EFI chainloader
+├── scripts/build-image.sh    ← image builder
+├── icons/                    ← optional icons
+└── src/                      ← future Go source
+```
 
 ## License
 
-Configuration files, scripts and documentation are under the MIT License.  
-The Linux kernel, GRUB binaries and the Go init binary retain their original licenses.
+Scripts, configuration and documentation: MIT License.  
+Kernel, GRUB binaries and the Go init binary retain their original licenses.

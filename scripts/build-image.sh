@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# SelectOS image builder
-# Creates a 512 MiB bootable FAT32 UEFI image from the repository tree.
+# SelectOS – production image builder
+# Creates a 512 MiB bootable FAT32 UEFI image.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="${ROOT}/dist"
@@ -10,12 +10,39 @@ IMG="${DIST}/SelectOS.img"
 SIZE_MB=512
 LABEL="SELECTOS"
 
-echo "==> Building SelectOS image (${SIZE_MB} MiB)"
+echo "==> SelectOS image builder"
 
+# -------------------------------------------------------
+# Check required binary components
+# -------------------------------------------------------
+missing=0
+for f in \
+  "boot/vmlinuz" \
+  "boot/gate.img" \
+  "EFI/BOOT/BOOTX64.EFI" \
+  "EFI/BOOT/grubx64.efi" \
+  "EFI/BOOT/mmx64.efi"
+do
+  if [[ ! -f "${ROOT}/${f}" ]]; then
+    echo "ERROR: Missing required file: ${f}"
+    missing=1
+  fi
+done
+
+if [[ ${missing} -eq 1 ]]; then
+  echo
+  echo "Please place the required binary files in the repository tree."
+  echo "See README.md for extraction instructions from the original image."
+  exit 1
+fi
+
+# -------------------------------------------------------
+# Build
+# -------------------------------------------------------
 rm -rf "${DIST}"
 mkdir -p "${DIST}"
 
-echo "Creating empty image..."
+echo "Creating ${SIZE_MB} MiB image..."
 dd if=/dev/zero of="${IMG}" bs=1M count="${SIZE_MB}" status=none
 
 echo "Partitioning..."
@@ -26,7 +53,7 @@ parted -s "${IMG}" set 1 esp on 2>/dev/null || true
 
 LOOP=$(losetup -fP --show "${IMG}")
 PART="${LOOP}p1"
-echo "Using ${LOOP}"
+echo "Loop device: ${LOOP}"
 
 cleanup() {
   set +e
@@ -35,7 +62,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Formatting FAT32 (${LABEL})..."
+echo "Formatting FAT32 (label: ${LABEL})..."
 mkfs.vfat -F 32 -n "${LABEL}" "${PART}"
 
 MNT=$(mktemp -d)
@@ -44,15 +71,16 @@ mount "${PART}" "${MNT}"
 echo "Copying files..."
 mkdir -p "${MNT}/EFI/BOOT" "${MNT}/boot/grub" "${MNT}/icons"
 
-cp "${ROOT}/EFI/BOOT/"*          "${MNT}/EFI/BOOT/" 2>/dev/null || true
-cp "${ROOT}/boot/vmlinuz"        "${MNT}/boot/" 2>/dev/null || true
-cp "${ROOT}/boot/gate.img"       "${MNT}/boot/" 2>/dev/null || true
-cp "${ROOT}/boot/grub/grub.cfg"  "${MNT}/boot/grub/"
-cp "${ROOT}/config/gate.json"    "${MNT}/"
-cp "${ROOT}/icons/"*             "${MNT}/icons/" 2>/dev/null || true
+cp "${ROOT}/EFI/BOOT/BOOTX64.EFI"   "${MNT}/EFI/BOOT/"
+cp "${ROOT}/EFI/BOOT/grubx64.efi"   "${MNT}/EFI/BOOT/"
+cp "${ROOT}/EFI/BOOT/mmx64.efi"     "${MNT}/EFI/BOOT/"
+cp "${ROOT}/EFI/BOOT/grub.cfg"      "${MNT}/EFI/BOOT/"
+cp "${ROOT}/boot/vmlinuz"           "${MNT}/boot/"
+cp "${ROOT}/boot/gate.img"          "${MNT}/boot/"
+cp "${ROOT}/boot/grub/grub.cfg"     "${MNT}/boot/grub/"
+cp "${ROOT}/config/gate.json"       "${MNT}/"
+cp "${ROOT}/icons/"*                "${MNT}/icons/" 2>/dev/null || true
 touch "${MNT}/gate.marker"
-
-chmod 755 "${MNT}/EFI/BOOT/"* "${MNT}/boot/vmlinuz" "${MNT}/boot/gate.img" 2>/dev/null || true
 
 sync
 umount "${MNT}"
@@ -61,9 +89,9 @@ losetup -d "${LOOP}"
 trap - EXIT
 
 echo
-echo "==> Done: ${IMG}"
+echo "==> Success: ${IMG}"
 ls -lh "${IMG}"
 echo
-echo "Write to USB with:"
+echo "Write to USB:"
 echo "  sudo dd if=${IMG} of=/dev/sdX bs=4M status=progress oflag=sync"
-echo "(Replace /dev/sdX carefully!)"
+echo "(Replace /dev/sdX with your actual USB device)"
