@@ -31,6 +31,8 @@ jobs:
         run: |
           go test ./...
           go build -o /tmp/selectos-auth .
+      - name: Build server Docker image
+        run: docker build -t selectos-auth:test auth/server
       - name: Build client
         working-directory: auth/client
         run: |
