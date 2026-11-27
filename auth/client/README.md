@@ -6,7 +6,7 @@ This is a Go command-line reference client for testing the LAN authentication AP
 
 ```sh
 cd auth/client
-go mod download
+go mod tidy
 go build -o selectos-auth-client .
 ```
 
