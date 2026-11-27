@@ -33,7 +33,7 @@ done
 if (( ${#missing[@]} )); then
   printf 'ERROR: Required file missing or empty: %s\n' "${missing[@]}" >&2
   echo "Provide the five boot binaries extracted from the compatible legacy image." >&2
-  echo "See README.md for the required release archive layout." >&2
+  echo "See README.md for the required source image and extracted boot files." >&2
   exit 1
 fi
 
@@ -89,7 +89,7 @@ cp "$ROOT/boot/grub/grub.cfg" "$MNT/boot/grub/"
 cp "$ROOT/config/select.json" "$MNT/gate.json"
 
 if compgen -G "$ROOT/icons/*" >/dev/null; then
-  cp -a "$ROOT"/icons/. "$MNT/icons/"
+  cp -r "$ROOT"/icons/. "$MNT/icons/"
 fi
 touch "$MNT/gate.marker"
 sync
