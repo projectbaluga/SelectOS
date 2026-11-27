@@ -2,6 +2,8 @@
 # SelectOS Gate authentication hook.
 # Exit 0 only after online or permitted offline authentication succeeds.
 set -eu
+restore_terminal() { stty echo 2>/dev/null || true; }
+trap restore_terminal EXIT HUP INT TERM
 
 CLIENT=${SELECTOS_AUTH_CLIENT:-/usr/bin/selectos-auth-client}
 SERVER=${SELECTOS_AUTH_SERVER:-}
@@ -30,11 +32,10 @@ fi
 printf "Password: "
 stty -echo
 if ! IFS= read -r SELECTOS_PASSWORD; then
-  stty echo
   printf "\n"
   exit 2
 fi
-stty echo
+restore_terminal
 printf "\n"
 
 export SELECTOS_PASSWORD
@@ -53,7 +54,6 @@ if [ "$status" -eq 0 ]; then
   unset SELECTOS_PASSWORD
   exit 0
 fi
-
 if [ "$status" -ne 3 ]; then
   unset SELECTOS_PASSWORD
   exit "$status"
