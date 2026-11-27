@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# SelectOS image builder. The boot binaries are supplied separately and are
-# deliberately not fabricated by this script.
+# SelectOS image builder. The legacy Gate initramfs is retained as the runtime
+# for this rebrand; its on-disk compatibility names are gate.img/gate.json/
+# gate.marker internally. The image filenames and visible branding are SelectOS.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="${ROOT}/dist"
 IMG="${DIST}/SelectOS.img"
@@ -31,7 +32,7 @@ for f in "${required[@]}"; do
 done
 if (( ${#missing[@]} )); then
   printf 'ERROR: Required file missing or empty: %s\n' "${missing[@]}" >&2
-  echo "Provide the five boot binaries from a trusted, compatible SelectOS build." >&2
+  echo "Provide the five boot binaries extracted from the compatible legacy image." >&2
   echo "See README.md for the required release archive layout." >&2
   exit 1
 fi
@@ -81,12 +82,16 @@ cp "$ROOT/EFI/BOOT/BOOTX64.EFI" "$ROOT/EFI/BOOT/grubx64.efi" "$ROOT/EFI/BOOT/mmx
 cp "$ROOT/EFI/BOOT/grub.cfg" "$MNT/EFI/BOOT/"
 cp "$ROOT/boot/vmlinuz" "$ROOT/boot/select.img" "$MNT/boot/"
 cp "$ROOT/boot/grub/grub.cfg" "$MNT/boot/grub/"
+
+# The legacy initramfs explicitly loads /gate.json and searches for
+# /sys/class/block/esp/gate.marker. Keep these internal compatibility names
+# while the boot menu, image label, and JSON brand use SelectOS.
 cp "$ROOT/config/select.json" "$MNT/gate.json"
 
 if compgen -G "$ROOT/icons/*" >/dev/null; then
   cp -a "$ROOT"/icons/. "$MNT/icons/"
 fi
-touch "$MNT/select.marker"
+touch "$MNT/gate.marker"
 sync
 cleanup
 trap - EXIT

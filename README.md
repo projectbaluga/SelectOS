@@ -1,30 +1,34 @@
 # SelectOS
 
-Lightweight UEFI multi-boot selector.
+Lightweight UEFI multi-boot selector, rebranded from the supplied legacy Gate image.
 
-SelectOS is intended to boot a minimal Linux environment, detect installed operating systems, and present a configurable menu for choosing an OS.
+SelectOS boots a minimal Linux environment, detects installed operating systems, and presents a configurable menu for choosing an OS.
 
-> **Build status:** the repository contains the image-building scripts and configuration, but does not currently contain the kernel, initramfs, or UEFI executable binaries. A bootable image cannot be produced until those real, compatible files are supplied. The build intentionally fails rather than creating placeholder binaries.
+> **Build status:** the original image supplied for this project contains a real Linux kernel, Gate initramfs, and UEFI binaries. These have been extracted into the correctly named SelectOS build archive. The legacy initramfs remains a prebuilt binary; its original source/build recipe is not present in this repository.
 
-## Repository contents and build inputs
+## Boot components
 
 The image builder expects these files:
 
 | Required path | Purpose |
 |---|---|
-| `boot/vmlinuz` | Linux kernel |
-| `boot/select.img` | SelectOS initramfs, including its `/init` program |
+| `boot/vmlinuz` | Linux kernel (from the supplied legacy image) |
+| `boot/select.img` | Legacy Gate initramfs, renamed for the SelectOS build layout |
 | `EFI/BOOT/BOOTX64.EFI` | UEFI removable-media boot manager |
 | `EFI/BOOT/grubx64.efi` | GRUB EFI executable |
-| `EFI/BOOT/mmx64.efi` | MokManager executable, if required by the chosen GRUB build |
+| `EFI/BOOT/mmx64.efi` | MokManager executable |
 
-The repository currently tracks configuration and build scripts, not the source/build recipes needed to recreate all five binaries. Obtain them from a trusted SelectOS build or build them from their corresponding upstream sources and the project's own initramfs source. Do not substitute empty files, arbitrary EFI executables, or binaries from an unrelated image.
+The archive `boot-binaries.tar.gz` is prepared from the user-supplied `gate-test.img.gz`. Its five paths match the workflow's required archive layout. The archive must be attached to a GitHub Release as an asset named exactly `boot-binaries.tar.gz` before the cloud build can download it.
 
-## Prepare the boot-binaries release asset
+## Legacy runtime compatibility
 
-Create a gzip-compressed tar archive whose paths are relative to the repository root and exactly match the table above. The archive must contain all five files, not an enclosing directory.
+The original initramfs is still the Gate runtime binary. Inspection confirms that it expects the on-image configuration file `/gate.json` and the marker file `/gate.marker`. Therefore the builder deliberately copies `config/select.json` to `gate.json` and creates `gate.marker`, while the user-facing branding and GRUB menu use SelectOS. Do not rename these two internal runtime paths unless the initramfs itself is rebuilt and tested.
 
-Example archive layout:
+The original initramfs also contains the legacy Gate application binary. The visible branding is supplied through `config/select.json`; this does not recompile or rename the internal program.
+
+## Prepare or update the boot-binaries release
+
+The prepared archive must contain these exact relative paths, with no enclosing directory:
 
 ```text
 boot/vmlinuz
@@ -34,9 +38,9 @@ EFI/BOOT/grubx64.efi
 EFI/BOOT/mmx64.efi
 ```
 
-After obtaining the real files, create `boot-binaries.tar.gz` and attach it to a GitHub Release in this repository. Name the asset exactly `boot-binaries.tar.gz`. The workflow input `binaries_release` must be `latest` or the exact release tag.
+Attach the prepared `boot-binaries.tar.gz` file to a GitHub Release in this repository and name the release asset exactly `boot-binaries.tar.gz`. The workflow input `binaries_release` must be `latest` or the exact release tag.
 
-For maintainers using GitHub CLI from a trusted machine where the files are already prepared:
+For future maintainers who have the extracted files available locally:
 
 ```bash
 tar -czf boot-binaries.tar.gz boot/vmlinuz boot/select.img \
@@ -52,8 +56,6 @@ gh release upload binaries boot-binaries.tar.gz \
   --repo projectbaluga/SelectOS --clobber
 ```
 
-Keep the release asset private to the repository's intended distribution and verify the licensing and provenance of every included binary.
-
 ## Build with GitHub Actions
 
 1. Open **Actions** in this repository.
@@ -63,7 +65,7 @@ Keep the release asset private to the repository's intended distribution and ver
 5. Run the workflow and inspect its logs.
 6. If successful, download the `SelectOS-image` artifact.
 
-The workflow validates the archive and all required files before invoking the image builder. A missing release, missing archive member, corrupt archive, or empty file stops the job with an explicit error. The workflow does not manufacture boot binaries.
+The workflow validates the archive and all required files before invoking the image builder. A missing release, missing archive member, corrupt archive, or empty file stops the job with an explicit error.
 
 ## Build locally
 
@@ -89,7 +91,7 @@ Replace `/dev/sdX` with the correct USB device. Never guess the device name.
 
 ## Configuration
 
-Edit `config/select.json` to change branding and operating-system presentation rules.
+Edit `config/select.json` to change SelectOS branding and operating-system presentation rules. The legacy initramfs reads this file at runtime through the compatibility copy at `/gate.json`.
 
 ## Project structure
 
@@ -104,9 +106,11 @@ SelectOS/
 └── src/
 ```
 
-## Known implementation work
+## Known limitations and next steps
 
-The current tracked `src/` directory does not yet provide the initramfs build recipe or the runtime `/init` implementation. Those are prerequisites for a reproducible end-to-end build. The GRUB configuration and image layout also need to be tested against the actual kernel/initramfs pair and target firmware before describing the image as production-ready.
+- The initramfs and its embedded Gate application are supplied as a prebuilt binary; their source and reproducible build recipe are not included.
+- The legacy runtime still contains Gate-specific internal strings and compatibility paths. The JSON branding changes the displayed product name, but does not recompile the program.
+- The image layout and firmware behavior still need a successful GitHub Actions build and a real UEFI boot test before calling the image production-ready.
 
 ## License
 
