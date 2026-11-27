@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -34,7 +35,11 @@ func main() {
 	db, err := sql.Open("pgx", databaseURL)
 	if err != nil { log.Fatal(err) }
 	defer db.Close()
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	pingCtx, cancelPing := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelPing()
+	if err = db.PingContext(pingCtx); err != nil { log.Fatalf("database unavailable: %v", err) }
 	if err = migrate(db); err != nil { log.Fatal(err) }
 	s := &Server{db:db, tokenKey:[]byte(keyText), issuer:"selectos-local"}
 	if err = s.bootstrapAdmin(); err != nil { log.Fatal(err) }
@@ -87,12 +92,13 @@ func (s *Server) bootstrapAdmin() error {
 	_, err = s.db.Exec("INSERT INTO users(username,password_hash,role) VALUES($1,$2,'admin') ON CONFLICT DO NOTHING", u, string(hash))
 	return err
 }
-func (s *Server) health(w http.ResponseWriter, r *http.Request) { write(w,200,response{"status":"ok","service":"selectos-auth","time":time.Now().UTC()}) }
+func (s *Server) health(w http.ResponseWriter, r *http.Request) { ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second); defer cancel(); if err := s.db.PingContext(ctx); err != nil { write(w,503,response{"status":"degraded","service":"selectos-auth","error":"database unavailable"}); return }; write(w,200,response{"status":"ok","service":"selectos-auth","time":time.Now().UTC()}) }
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var in credentials
 	if json.NewDecoder(http.MaxBytesReader(w,r.Body,4096)).Decode(&in) != nil || len(in.Username)>64 || len(in.Password)>256 { write(w,400,response{"error":"invalid request"}); return }
 	var c claims; var hash, role string; var enabled bool
 	err := s.db.QueryRow("SELECT id,username,password_hash,role,enabled FROM users WHERE LOWER(username)=LOWER($1)",strings.TrimSpace(in.Username)).Scan(&c.UserID,&c.Username,&hash,&role,&enabled)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) { write(w,503,response{"error":"authentication service unavailable"}); return }
 	ok := err == nil && enabled && bcrypt.CompareHashAndPassword([]byte(hash),[]byte(in.Password)) == nil
 	if !ok { s.audit(in.Username,"login_failed",r); write(w,401,response{"error":"invalid credentials"}); return }
 	c.Role=role; c.Expires=time.Now().Add(8*time.Hour).Unix()
@@ -127,10 +133,10 @@ func (s *Server) resetPassword(w http.ResponseWriter,r *http.Request,c claims) {
 	res,err:=s.db.Exec("UPDATE users SET password_hash=$1 WHERE id=$2",string(h),id);if err!=nil{write(w,500,response{"error":"database error"});return};n,_:=res.RowsAffected();if n==0{write(w,404,response{"error":"user not found"});return};write(w,200,response{"updated":true})
 }
 type handler func(http.ResponseWriter,*http.Request,claims)
-func (s *Server) auth(next handler) http.HandlerFunc { return func(w http.ResponseWriter,r *http.Request){p:=strings.SplitN(r.Header.Get("Authorization")," ",2);if len(p)!=2||p[0]!="Bearer"{write(w,401,response{"error":"missing bearer token"});return};c,err:=s.verify(p[1]);if err!=nil{write(w,401,response{"error":"invalid or expired token"});return};next(w,r,c)} }
+func (s *Server) auth(next handler) http.HandlerFunc { return func(w http.ResponseWriter,r *http.Request){p:=strings.SplitN(r.Header.Get("Authorization")," ",2);if len(p)!=2||p[0]!="Bearer"{write(w,401,response{"error":"missing bearer token"});return};c,err:=s.verify(p[1]);if err!=nil{write(w,401,response{"error":"invalid or expired token"});return};var enabled bool;var role string;if err=s.db.QueryRow("SELECT enabled,role FROM users WHERE id=$1",c.UserID).Scan(&enabled,&role);err!=nil||!enabled{write(w,401,response{"error":"account disabled or unavailable"});return};c.Role=role;next(w,r,c)} }
 func (s *Server) admin(next handler) handler { return func(w http.ResponseWriter,r *http.Request,c claims){if subtle.ConstantTimeCompare([]byte(c.Role),[]byte("admin"))!=1{write(w,403,response{"error":"admin required"});return};next(w,r,c)} }
 func (s *Server) sign(c claims)(string,error){b,e:=json.Marshal(c);if e!=nil{return "",e};mac:=hmac256(s.tokenKey,b);return base64.RawURLEncoding.EncodeToString(b)+"."+base64.RawURLEncoding.EncodeToString(mac),nil}
-func (s *Server) verify(t string)(claims,error){var c claims;p:=strings.Split(t,".");if len(p)!=2{return c,errors.New("bad token")};b,e:=base64.RawURLEncoding.DecodeString(p[0]);if e!=nil{return c,e};sig,e:=base64.RawURLEncoding.DecodeString(p[1]);if e!=nil{return c,e};if subtle.ConstantTimeCompare(sig,hmac256(s.tokenKey,b))!=1{return c,errors.New("bad signature")};if json.Unmarshal(b,&c)!=nil||c.Expires<time.Now().Unix(){return c,errors.New("expired")};return c,nil}
+func (s *Server) verify(t string)(claims,error){var c claims;p:=strings.Split(t,".");if len(p)!=2{return c,errors.New("bad token")};b,e:=base64.RawURLEncoding.DecodeString(p[0]);if e!=nil{return c,e};sig,e:=base64.RawURLEncoding.DecodeString(p[1]);if e!=nil{return c,e};if subtle.ConstantTimeCompare(sig,hmac256(s.tokenKey,b))!=1{return c,errors.New("bad signature")};now:=time.Now().Unix();if json.Unmarshal(b,&c)!=nil||c.UserID<=0||c.Username==""||c.Role==""||c.Expires<=now||c.Expires>now+8*60*60+60{return c,errors.New("invalid or expired claims")};return c,nil}
 func hmac256(key,data []byte)[]byte{h:=hmac.New(sha256.New,key);h.Write(data);return h.Sum(nil)}
 func (s *Server) audit(u,event string,r *http.Request){ip,_,_:=net.SplitHostPort(r.RemoteAddr);_,_=s.db.Exec("INSERT INTO audit(username,event,remote_ip) VALUES($1,$2,$3)",u,event,ip)}
 func validUser(u string)bool{if len(u)<3||len(u)>32{return false};for _,r:=range u{if !(r>='a'&&r<='z'||r>='A'&&r<='Z'||r>='0'&&r<='9'||r=='_'||r=='-'||r=='.'){return false}};return true}
