@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: selectos
+      POSTGRES_USER: selectos
+      POSTGRES_PASSWORD: ${SELECTOS_DB_PASSWORD:?Set SELECTOS_DB_PASSWORD in .env}
+    volumes:
+      - selectos-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U selectos -d selectos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [selectos-internal]
+
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: selectos-auth:local
+    restart: unless-stopped
+    init: true
+    environment:
+      SELECTOS_AUTH_ADDR: 0.0.0.0:8088
+      SELECTOS_DATABASE_URL: postgres://selectos:${SELECTOS_DB_PASSWORD}@postgres:5432/selectos?sslmode=disable
+      SELECTOS_AUTH_TOKEN_KEY: ${SELECTOS_AUTH_TOKEN_KEY:?Set SELECTOS_AUTH_TOKEN_KEY in .env}
+      SELECTOS_ADMIN_USER: ${SELECTOS_ADMIN_USER:-admin}
+      SELECTOS_ADMIN_PASSWORD: ${SELECTOS_ADMIN_PASSWORD:?Set SELECTOS_ADMIN_PASSWORD in .env}
+    ports:
+      - "${SELECTOS_AUTH_PORT:-8088}:8088"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8088/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    networks: [selectos-internal]
+
+volumes:
+  selectos-postgres:
+
+networks:
+  selectos-internal:
+    driver: bridge

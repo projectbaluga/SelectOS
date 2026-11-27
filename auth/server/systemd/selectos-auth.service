@@ -1,0 +1,23 @@
+[Unit]
+Description=SelectOS Local Authentication Server
+After=network.target
+
+[Service]
+Type=simple
+User=selectos-auth
+Group=selectos-auth
+WorkingDirectory=/opt/selectos-auth
+EnvironmentFile=/etc/selectos-auth.env
+ExecStart=/opt/selectos-auth/selectos-auth
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/selectos-auth
+StateDirectory=selectos-auth
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
