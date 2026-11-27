@@ -37,11 +37,11 @@ func main() {
 	}
 }
 func usage() {
-	fmt.Fprintln(os.Stderr, "SelectOS auth client\n  login --server http://debian-host:8088 --username USER\n  offline-check --username USER\nPassword is read from SELECTOS_PASSWORD; never put passwords in shell history.")
+	fmt.Fprintln(os.Stderr, "SelectOS auth client\n  login --server https://auth.example --username USER\n  offline-check --username USER\nPassword is read from SELECTOS_PASSWORD; never put passwords in shell history.\nExit status 3 means the server is unavailable (offline fallback may be attempted).")
 }
 func onlineLogin(args []string) {
 	fs := flag.NewFlagSet("login", flag.ExitOnError)
-	server := fs.String("server", "http://127.0.0.1:8088", "Authentication API base URL")
+	server := fs.String("server", "https://127.0.0.1:8088", "Authentication API base URL")
 	username := fs.String("username", "", "Account username")
 	cacheDir := fs.String("cache-dir", defaultCacheDir(), "Cache directory")
 	_ = fs.Parse(args)
@@ -56,6 +56,10 @@ func onlineLogin(args []string) {
 		fmt.Fprintln(os.Stderr, "server must be a base http(s) URL without credentials, path, query, or fragment")
 		os.Exit(2)
 	}
+	if base.Scheme != "https" && os.Getenv("SELECTOS_AUTH_ALLOW_HTTP") != "1" {
+		fmt.Fprintln(os.Stderr, "HTTPS is required. For isolated-LAN testing only, set SELECTOS_AUTH_ALLOW_HTTP=1.")
+		os.Exit(2)
+	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/v1/auth/login"
 	body, err := json.Marshal(loginRequest{Username: *username, Password: password})
 	if err != nil { fatal(fmt.Errorf("could not prepare login request")) }
@@ -67,16 +71,23 @@ func onlineLogin(args []string) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse // never forward credentials to a redirect target
+			return http.ErrUseLastResponse
 		},
 	}
 	resp, err := client.Do(req)
-	if err != nil { fatal(fmt.Errorf("cannot reach auth server: %w", err)) }
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Authentication server unavailable:", err)
+		os.Exit(3) // Only this status permits the Gate hook to try offline verification.
+	}
 	defer resp.Body.Close()
 	data, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if readErr != nil { fatal(fmt.Errorf("could not read auth server response")) }
+	if readErr != nil { fmt.Fprintln(os.Stderr, "Could not read auth server response."); os.Exit(3) }
+	if resp.StatusCode >= 500 {
+		fmt.Fprintf(os.Stderr, "Authentication service unavailable (HTTP %d).\n", resp.StatusCode)
+		os.Exit(3)
+	}
 	if resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "Server rejected login (HTTP %d). Check the username, password, and server logs.\n", resp.StatusCode)
+		fmt.Fprintf(os.Stderr, "Server rejected login (HTTP %d). Offline fallback is not permitted for rejected credentials.\n", resp.StatusCode)
 		os.Exit(1)
 	}
 	var result loginResponse
