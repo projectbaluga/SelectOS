@@ -11,6 +11,9 @@ on:
       - "tests/test-native-image-builder.sh"
       - "tests/test-native-efi-menu.sh"
       - "tests/test-uefi-loader.sh"
+      - "tests/test-qemu-ovmf-handoff.sh"
+      - "tests/uefi-handoff-child.c"
+      - "docs/QEMU-OVMF-UEFI-TEST.md"
       - "tests/test-native-init.sh"
       - "tests/test-efi-discovery.py"
       - "tests/test-boot-selector.py"
@@ -35,7 +38,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc binutils gnu-efi parted dosfstools util-linux gzip cpio busybox-static coreutils file
+          sudo apt-get install -y gcc binutils gnu-efi parted dosfstools util-linux gzip cpio busybox-static coreutils file qemu-system-x86 ovmf mtools
       - name: Extract kernel and UEFI boot files from compatibility source
         shell: bash
         run: |
@@ -85,6 +88,10 @@ jobs:
           bash tests/test-uefi-loader.sh
           python3 tests/test-efi-discovery.py
           python3 tests/test-boot-selector.py
+      - name: Run QEMU/OVMF UEFI handoff integration test
+        run: |
+          bash -n tests/test-qemu-ovmf-handoff.sh
+          bash tests/test-qemu-ovmf-handoff.sh
       - name: Build experimental x86_64 UEFI boot manager
         run: |
           bash scripts/build-uefi-loader.sh
