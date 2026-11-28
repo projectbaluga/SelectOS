@@ -6,7 +6,9 @@ on:
       - "src/native-initramfs/**"
       - "scripts/build-native-initramfs.sh"
       - "scripts/discover-efi-entries.py"
+      - "scripts/select-boot-entry.py"
       - "tests/test-native-init.sh"
+      - "tests/test-boot-selector.py"
       - "tests/test-efi-discovery.py"
       - "docs/NATIVE-RUNTIME-STATUS.md"
       - "docs/CONTROL-CENTER-CONNECT.md"
@@ -46,6 +48,8 @@ jobs:
         run: bash tests/test-native-init.sh
       - name: Test read-only EFI discovery prototype
         run: python3 tests/test-efi-discovery.py
+      - name: Test keyboard selector safety prototype
+        run: python3 tests/test-boot-selector.py
       - name: Build experimental initramfs
         run: bash scripts/build-native-initramfs.sh
       - name: Verify artifact and checksums
