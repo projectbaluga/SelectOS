@@ -14,7 +14,7 @@ grep -q 'L"selectos-debug.log"' "$SRC"
 grep -q 'SELECTOS_SCAN_RETURNED' "$SRC"
 grep -q 'BuildFileDevicePath' "$SRC"
 grep -q 'OpenPathFromRoot' "$SRC"
-grep -q 'Walk one component at a time' "$SRC"
+grep -q 'Walk an explicit list of CHAR16 components' "$SRC"
 # Regression checks: loader traversal uses explicit CHAR16 component arrays,
 # avoiding compiler wchar_t layout and path-separator parsing assumptions.
 grep -q 'ComponentCount' "$SRC"
