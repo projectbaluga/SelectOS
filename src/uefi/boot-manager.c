@@ -193,7 +193,6 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
     while (Path[i] == L'\\' || Path[i] == L'/') ++i;
     for (;;) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        { CHAR16 Marker[] = L"SELECTOS_LOOP_ENTERED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
 #endif
         j = 0;
         while (Path[i] != 0 && Path[i] != L'\\' && Path[i] != L'/') {
@@ -479,6 +478,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     }
 #endif
     for (;;) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        { CHAR16 Marker[] = L"SELECTOS_LOOP_ENTERED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+#endif
         UINTN i, Selection;
         EFI_STATUS Status;
 #ifndef SELECTOS_QEMU_TEST_DIAGNOSTICS
