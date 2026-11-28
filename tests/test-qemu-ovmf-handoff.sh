@@ -50,6 +50,10 @@ build_efi() {
 }
 build_efi "$ROOT/src/uefi/boot-manager.c" "$WORK/BOOTX64.EFI" boot-manager
 build_efi "$ROOT/tests/uefi-handoff-child.c" "$WORK/grubx64.efi" handoff-child
+echo "UEFI application section table:"
+objdump -h "$WORK/BOOTX64.EFI"
+echo "Disassembly near observed OVMF exception offset 0x7e7d:"
+objdump -d -Mintel "$WORK/BOOTX64.EFI" | grep -i -B 8 -A 8 "7e7d" || true
 
 truncate -s 64M "$WORK/uefi-test.img"
 parted -s "$WORK/uefi-test.img" mklabel gpt
