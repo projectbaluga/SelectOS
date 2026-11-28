@@ -1,79 +1,67 @@
-# Experimental native image build
+# Experimental native SelectOS image
 
-This procedure creates a **separate experimental UEFI image** using the native
-PID 1/initramfs bring-up prototype. It does not replace the legacy image and it
-does not claim to boot Windows or Linux.
+This procedure builds a separate experimental x86_64 UEFI image. It does not
+replace the legacy image or claim production readiness.
 
-## Inputs
-
-The build expects these source inputs to be staged in the repository:
-
-- `boot/vmlinuz`: compatible x86_64 Linux kernel
-- `EFI/BOOT/BOOTX64.EFI`, `grubx64.efi`, `mmx64.efi`
-- GRUB configuration files under `EFI/BOOT` and `boot/grub`
-- `config/select.json`
-- `dist/native/select-native.img`, produced by `scripts/build-native-initramfs.sh`
-
-The native initramfs build requires static BusyBox, util-linux `blkid`,
-`ldd`/`awk` for bundling its runtime libraries, cpio, gzip, coreutils, and file. The image packaging step additionally
-requires parted, dosfstools, util-linux, and root privileges. The booted kernel
-must support the target disk controller and FAT/VFAT filesystems; unsupported
-hardware or filesystems are skipped without writes.
-
-## Build
+## Build dependencies
 
 On Debian/Ubuntu:
 
-```sh
+\`\`\`sh
 sudo apt-get update
-sudo apt-get install -y busybox-static cpio gzip coreutils file parted dosfstools util-linux
+sudo apt-get install -y gcc binutils gnu-efi busybox-static cpio gzip coreutils file parted dosfstools util-linux
+sudo bash scripts/build-uefi-loader.sh
 sudo bash scripts/build-native-initramfs.sh
 sudo SELECTOS_BUILD_NATIVE_EXPERIMENTAL=1 bash scripts/build-native-image.sh
-```
+\`\`\`
 
-Output: `dist/native/SelectOS-native-experimental.img`.
+The UEFI application is emitted as \`dist/native/selectos.efi\`. The native
+image is emitted as \`dist/native/SelectOS-native-experimental.img\`. Both
+builders refuse to overwrite existing outputs. Set
+\`SELECTOS_UEFI_LOADER_OUT\` or \`SELECTOS_NATIVE_IMAGE_OUT\` to choose a
+different path.
 
-The image builder refuses to overwrite an existing output. To choose another
-path, set `SELECTOS_NATIVE_IMAGE_OUT`; to change the image size, set
-`SELECTOS_NATIVE_IMAGE_SIZE_MB` (minimum 128 MiB). It never removes the
-repository's `dist` directory or the legacy `dist/SelectOS.img`.
+## UEFI-stage boot manager (experimental)
 
-## Phase 2 behavior
+The GRUB menu includes an explicit **SelectOS UEFI Boot Manager
+(experimental)** entry. The existing native Linux diagnostic boot remains the
+default. Choosing the UEFI entry chainloads
+\`EFI/SelectOS/selectos.efi\` while UEFI Boot Services are still available.
 
-At native PID 1 startup, SelectOS enumerates partition nodes in sysfs, uses the bundled util-linux `blkid` binary for the GPT partition type, and considers only the standard EFI
-System Partition GUID. It mounts each candidate temporarily with
-`ro,nosuid,nodev,noexec`, checks a fixed allowlist of common Windows/Linux EFI
-loader paths, and unmounts it immediately. It does not repair, format, or write
-to any partition.
+The application enumerates UEFI Simple File System volumes, opens only a
+fixed allowlist of common loader paths read-only, and presents a firmware
+keyboard menu. On selection it creates a file device path and calls UEFI
+\`LoadImage\` and \`StartImage\` to hand control to the selected loader. It
+does not pass input to a shell, construct arbitrary paths, change
+\`BootOrder\`/\`BootNext\`, write NVRAM variables, or call \`ExitBootServices\`.
+If a child loader returns, the menu is shown again.
 
-If known loaders are found, a keyboard menu accepts a numeric index or `q`.
-The selected item is printed as a diagnostic record. Keyboard input is never
-treated as a path or shell command.
+This is an initial handoff implementation, not a complete production boot
+manager. It scans UEFI-readable filesystem volumes rather than proving each
+volume is a GPT EFI System Partition. It recognizes only the allowlisted
+paths in \`src/uefi/boot-manager.c\`; vendor-specific layouts, other CPU
+architectures, and all Linux distributions are not covered.
 
-## Important limitations
+## Secure Boot
 
-The menu is integrated into the initramfs, but **selection does not boot the
-chosen operating system yet**. Linux has already taken control from UEFI by
-the time PID 1 runs; an EFI executable cannot safely be launched as if UEFI
-Boot Services were still active. A separate, audited EFI-stage loader/handoff
-is required. This build does not write `BootNext`, use efivarfs, change NVRAM,
-or execute discovered EFI programs.
+The generated GNU-EFI application is **unsigned**. With Secure Boot enabled,
+firmware or an enforcing shim/GRUB may reject it unless signed by a key trusted
+by that machine. SelectOS does not disable Secure Boot, bypass signature
+checks, enroll keys, or modify MOK/NVRAM. A future signed release needs a
+reproducible signing and key-management process. Do not disable Secure Boot
+merely to test this experimental build.
 
-The scanner recognizes only a fixed list of common loader paths and depends on
-kernel block-device and VFAT support. It does not yet parse vendor-specific
-boot variables, Secure Boot policy, LUKS, RAID, or every possible EFI layout.
-The image manifest explicitly marks the build as not production-ready.
+The selected OS loader is passed through firmware \`LoadImage\`; this
+application does not patch or bypass image authentication. Secure Boot
+behavior has not been verified across firmware implementations.
 
-Do not flash it as a replacement for a working multi-boot system. Validate it
-with QEMU/OVMF and then representative physical UEFI hardware after a real
-EFI-stage handoff implementation is available.
+## Validation and release limits
 
-## Safety guarantees for this phase
+CI compiles the PE/COFF x86_64 EFI application, checks its file type, runs
+source safety tests, and builds both image artifacts. This does not prove
+compatibility with every UEFI implementation. QEMU/OVMF integration tests and
+physical hardware testing remain required.
 
-- Discovery is read-only and ESP mounts include `ro,nosuid,nodev,noexec`.
-- Only allowlisted loader filenames are displayed.
-- Menu input is a numeric entry index or cancel; it is never executed.
-- No UEFI variable, partition table, filesystem content, or installed OS is
-  modified.
-- Control Center, LAN, internet, authentication, and PostgreSQL are not boot
-  dependencies.
+The manifest intentionally retains \`PRODUCTION_READY=false\`. Keep a known
+working boot path and do not replace a production bootloader with this
+experimental image.
