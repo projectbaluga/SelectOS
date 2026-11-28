@@ -12,7 +12,6 @@ for cmd in busybox cpio gzip sha256sum file find sort install grep; do
     exit 1
   }
 done
-[[ -s "$ROOT/boot/vmlinuz" ]] || { echo "ERROR: boot/vmlinuz is missing." >&2; exit 1; }
 [[ -s "$SRC/init" ]] || { echo "ERROR: native /init source is missing." >&2; exit 1; }
 BUSYBOX="$(command -v busybox)"
 if ! file "$BUSYBOX" 2>/dev/null | grep -q 'statically linked'; then
@@ -33,7 +32,6 @@ install -m 0755 "$SRC/init" "$WORK/root/init"
   cd "$WORK/root"
   find . -print0 | sort -z | cpio --null -o --format=newc --owner=0:0 2>"$WORK/cpio.log" | gzip -n -9 > "$OUT/select-native.img"
 )
-install -m 0644 "$ROOT/boot/vmlinuz" "$OUT/vmlinuz"
 cat > "$OUT/BUILD-INFO.txt" <<'INFO'
 PRODUCT=SelectOS
 RUNTIME=native-initramfs-bringup
@@ -45,8 +43,8 @@ WARNING=Experimental diagnostic initramfs only; does not yet select or boot oper
 INFO
 (
   cd "$OUT"
-  sha256sum vmlinuz select-native.img BUILD-INFO.txt > SHA256SUMS
+  sha256sum select-native.img BUILD-INFO.txt > SHA256SUMS
 )
-echo "Native initramfs built:"
-ls -lh "$OUT/vmlinuz" "$OUT/select-native.img" "$OUT/BUILD-INFO.txt"
+echo "Native initramfs archive built (kernel image is supplied separately by the image build):"
+ls -lh "$OUT/select-native.img" "$OUT/BUILD-INFO.txt"
 echo "NOT a complete bootable SelectOS release. See docs/NATIVE-RUNTIME-STATUS.md."
