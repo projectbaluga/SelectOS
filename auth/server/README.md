@@ -14,29 +14,23 @@ Go API and administrator dashboard for a Debian server on the local network. It 
 
 The dashboard administrator account is management-plane access. It is not a SelectOS workstation login and is not required for boot or OS selection. The existing legacy Gate/Gbox boot runtime remains a separate migration problem.
 
-## Deploy
+## Deploy (one command)
 
-Install Docker Engine and the Compose plugin on Debian. Clone the feature branch (or use the merged release), then:
+Install Docker Engine, the Docker Compose plugin, OpenSSL, and curl on Debian. From the repository root, run:
 
-    cd SelectOS/auth/server
-    cp .env.example .env
-    openssl rand -hex 32
-    openssl rand -hex 32
-    openssl rand -hex 32
-    chmod 600 .env
-    nano .env
+    cd ~/SelectOS
+    bash auth/server/setup.sh
 
-Use independent random values for SELECTOS_DB_PASSWORD, SELECTOS_AUTH_TOKEN_KEY, and SELECTOS_DEVICE_ENROLLMENT_TOKEN. Set SELECTOS_ADMIN_PASSWORD to a unique password of at least 12 characters. Keep .env private.
+The setup script is designed to be re-run safely:
 
-The default SELECTOS_BIND_IP is 127.0.0.1. This is deliberate: put a TLS reverse proxy on the Debian host. A sample private-CA Caddy configuration is in deploy/Caddyfile. Set the private DNS name and install/trust the Caddy root certificate on administrator browsers and endpoint PCs.
+- On a genuinely new install, it generates independent database, signing, and enrollment secrets, creates a mode-0600 `.env`, and prints the initial administrator password once. Save that password securely.
+- On an existing install, it keeps the current `.env`, starts PostgreSQL, creates a compressed database backup, then builds and updates the API.
+- If a database volume exists but `.env` is missing or contains template placeholders, it stops instead of inventing a new database password that could disconnect the existing database.
+- It checks the API health endpoint before reporting success.
 
-Start and verify:
+Do not replace an existing `.env` with `.env.example`. The database password must remain the same one used when the PostgreSQL volume was initialized. Keep `.env` private and never commit it.
 
-    docker compose up -d --build
-    docker compose ps
-    curl http://127.0.0.1:8088/healthz
-
-For a temporary isolated-LAN test only, set SELECTOS_BIND_IP to the server's LAN IP and use HTTP. HTTP sends passwords and bearer tokens in cleartext; do not use it on shared or untrusted networks. Never publish the PostgreSQL port or expose the API to the public internet.
+The default `SELECTOS_BIND_IP` is `127.0.0.1`. Put a TLS reverse proxy in front of the API before allowing browser or agent access from other LAN machines. A sample private-CA Caddy configuration is in `deploy/Caddyfile`. For a temporary isolated-LAN test only, binding directly to the server LAN IP over HTTP is possible, but passwords and bearer tokens are sent in cleartext. Never expose the API or PostgreSQL to the public internet.
 
 ## Enroll PCs
 
