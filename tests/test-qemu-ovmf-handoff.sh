@@ -81,9 +81,12 @@ cmd = [
     "-drive", f"if=pflash,format=raw,file={variables}",
     "-display", "none", "-serial", f"file:{serial_log}",
     "-monitor", "none", "-qmp", f"unix:{qmp_path},server=on,wait=off",
-    "-device", "qemu-xhci,id=xhci",
-    "-drive", f"if=none,id=stick,format=raw,file={image}",
-    "-device", "usb-storage,drive=stick,bus=xhci.0,bootindex=1",
+    # Use the emulated PIIX IDE controller: it is available in the
+    # baseline OVMF build and avoids relying on the optional USB/XHCI DXE
+    # drivers being present in a distro firmware package.
+    "-drive", f"if=none,id=systemdisk,format=raw,file={image}",
+    "-device", "ide-hd,drive=systemdisk,bus=ide.0,bootindex=1",
+    "-boot", "order=c",
     "-no-reboot", "-no-shutdown",
 ]
 proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -117,8 +120,8 @@ try:
             if "error" in response:
                 raise RuntimeError(f"QMP {command} failed: {response['error']}")
     qmp("qmp_capabilities")
-    # Allow OVMF to enumerate the removable FAT volume and launch SelectOS.
-    time.sleep(10)
+    # Allow OVMF to enumerate the GPT disk and launch the fallback EFI application.
+    time.sleep(12)
     try:
         qmp("human-monitor-command", {"command-line": "sendkey 1"})
         time.sleep(0.3)
@@ -127,7 +130,7 @@ try:
         # The FAT marker is the authoritative assertion that the selected child ran.
         pass
     # The child app writes a marker to the same FAT volume before returning.
-    time.sleep(4)
+    time.sleep(5)
 finally:
     try:
         sock.close()
