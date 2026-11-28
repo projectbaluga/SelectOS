@@ -18,9 +18,9 @@ static VOID WriteTestDiagnostics(EFI_HANDLE ImageHandle) {
     EFI_STATUS Status;
     CHAR8 Buffer[128];
     UINTN Length = 0, i;
-    const CHAR8 Prefix[] = "SELECTOS_MANAGER_STARTED\\n";
+    const CHAR8 Prefix[] = "SELECTOS_MANAGER_STARTED\n";
     const CHAR8 Scan[] = "SCAN_HANDLES=";
-    const CHAR8 EntriesText[] = "\\nENTRIES=";
+    const CHAR8 EntriesText[] = "\nENTRIES=";
     Status = uefi_call_wrapper(BS->HandleProtocol, 3, ImageHandle, &LoadedImageProtocol, (VOID **)&Loaded);
     if (EFI_ERROR(Status) || Loaded == NULL) return;
     Status = uefi_call_wrapper(BS->HandleProtocol, 3, Loaded->DeviceHandle, &SimpleFsGuid, (VOID **)&Fs);
@@ -40,7 +40,7 @@ static VOID WriteTestDiagnostics(EFI_HANDLE ImageHandle) {
         do { Digits[Count++] = (CHAR8)('0' + (Value % 10)); Value /= 10; } while (Value && Count < sizeof(Digits));
         for (j = Count; j > 0; --j) Buffer[Length++] = Digits[j - 1];
     }
-    Buffer[Length++] = '\\n';
+    Buffer[Length++] = '\n';
     Status = uefi_call_wrapper(Root->Open, 5, Root, &File, L"\\selectos-debug.log",
                                EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
     if (!EFI_ERROR(Status) && File != NULL) {
