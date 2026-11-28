@@ -17,10 +17,10 @@ grep -q 'OpenPathFromRoot' "$SRC"
 grep -q 'Walk one component at a time' "$SRC"
 # Regression checks: C wide-character literals must use one escaped backslash,
 # and diagnostics must emit CRLF rather than the literal characters \\r\\n.
-grep -Fq "Path[i] == L'\\\\\\\\'" "$SRC"
-grep -Fq "Path[i] != 0 && Path[i] != L'\\\\\\\\'" "$SRC"
-grep -Fq 'ConsoleWriteString(L"\\r\\n");' "$SRC"
-grep -Fq 'SELECTOS_TEST_CHILD_PATH_NOT_FOUND\\r\\n' "$SRC"
+grep -Fq "Path[i] == L'\\'" "$SRC"
+grep -Fq "Path[i] != 0 && Path[i] != L'\\'" "$SRC"
+grep -Fq 'ConsoleWriteString(L"\r\n");' "$SRC"
+grep -Fq 'SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n' "$SRC"
 grep -q 'LocalPrint' "$SRC"
 if grep -Eq '(^|[^[:alnum:]_])Print[[:space:]]*\(' "$SRC"; then
   echo "UEFI loader must not call GNU-EFI Print/CatPrint." >&2
