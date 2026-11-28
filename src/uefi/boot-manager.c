@@ -85,13 +85,80 @@ static UINTN ReadSelection(VOID) {
         }
     }
 }
+#ifndef MEDIA_DEVICE_PATH
+#define MEDIA_DEVICE_PATH 0x04
+#endif
+#ifndef MEDIA_FILEPATH_DP
+#define MEDIA_FILEPATH_DP 0x04
+#endif
+#ifndef END_DEVICE_PATH_TYPE
+#define END_DEVICE_PATH_TYPE 0x7f
+#endif
+#ifndef END_ENTIRE_DEVICE_PATH_SUBTYPE
+#define END_ENTIRE_DEVICE_PATH_SUBTYPE 0xff
+#endif
+
+/* Build a file device path locally instead of using GNU-EFI's FileDevicePath.
+ * Some distro-built GNU-EFI libraries use newer SIMD instructions than the
+ * baseline x86-64 CPU exposed by common firmware and emulators.
+ */
+static EFI_DEVICE_PATH_PROTOCOL *BuildFileDevicePath(EFI_HANDLE Device, const CHAR16 *Path) {
+    EFI_DEVICE_PATH_PROTOCOL *Base = NULL, *Node, *Result;
+    EFI_STATUS Status;
+    UINTN BaseSize = 0, NodeLength, PathChars = 0, FileNodeSize, BasePrefix, TotalSize, i;
+    Status = uefi_call_wrapper(BS->HandleProtocol, 3, Device, &DevicePathProtocol, (VOID **)&Base);
+    if (EFI_ERROR(Status) || Base == NULL) return NULL;
+
+    Node = Base;
+    for (;;) {
+        NodeLength = (UINTN)Node->Length[0] | ((UINTN)Node->Length[1] << 8);
+        if (NodeLength < sizeof(EFI_DEVICE_PATH_PROTOCOL)) return NULL;
+        if (Node->Type == END_DEVICE_PATH_TYPE && Node->SubType == END_ENTIRE_DEVICE_PATH_SUBTYPE) {
+            if (NodeLength != sizeof(EFI_DEVICE_PATH_PROTOCOL)) return NULL;
+            BaseSize += NodeLength;
+            break;
+        }
+        BaseSize += NodeLength;
+        if (BaseSize > 65536) return NULL;
+        Node = (EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)Node + NodeLength);
+    }
+
+    while (Path[PathChars] != 0) {
+        ++PathChars;
+        if (PathChars > 4096) return NULL;
+    }
+    FileNodeSize = sizeof(EFI_DEVICE_PATH_PROTOCOL) + (PathChars + 1) * sizeof(CHAR16);
+    if (FileNodeSize > 0xffff) return NULL;
+    BasePrefix = BaseSize - sizeof(EFI_DEVICE_PATH_PROTOCOL);
+    TotalSize = BasePrefix + FileNodeSize + sizeof(EFI_DEVICE_PATH_PROTOCOL);
+    Status = uefi_call_wrapper(BS->AllocatePool, 3, EfiBootServicesData, TotalSize, (VOID **)&Result);
+    if (EFI_ERROR(Status) || Result == NULL) return NULL;
+
+    for (i = 0; i < BasePrefix; ++i) ((UINT8 *)Result)[i] = ((UINT8 *)Base)[i];
+    Node = (EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)Result + BasePrefix);
+    Node->Type = MEDIA_DEVICE_PATH;
+    Node->SubType = MEDIA_FILEPATH_DP;
+    Node->Length[0] = (UINT8)(FileNodeSize & 0xff);
+    Node->Length[1] = (UINT8)((FileNodeSize >> 8) & 0xff);
+    {
+        CHAR16 *Destination = (CHAR16 *)((UINT8 *)Node + sizeof(EFI_DEVICE_PATH_PROTOCOL));
+        for (i = 0; i <= PathChars; ++i) Destination[i] = Path[i];
+    }
+    Node = (EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)Node + FileNodeSize);
+    Node->Type = END_DEVICE_PATH_TYPE;
+    Node->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+    Node->Length[0] = (UINT8)sizeof(EFI_DEVICE_PATH_PROTOCOL);
+    Node->Length[1] = 0;
+    return Result;
+}
+
 static EFI_STATUS LaunchEntry(EFI_HANDLE ImageHandle, const BOOT_ENTRY *Entry) {
     EFI_DEVICE_PATH_PROTOCOL *DevicePath;
     EFI_HANDLE ChildImage = NULL;
     EFI_STATUS Status;
     UINTN ExitDataSize = 0;
     CHAR16 *ExitData = NULL;
-    DevicePath = FileDevicePath(Entry->Device, (CHAR16 *)Entry->Path);
+    DevicePath = BuildFileDevicePath(Entry->Device, Entry->Path);
     if (DevicePath == NULL) return EFI_OUT_OF_RESOURCES;
     Status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, ImageHandle, DevicePath, NULL, 0, &ChildImage);
     uefi_call_wrapper(BS->FreePool, 1, DevicePath);
