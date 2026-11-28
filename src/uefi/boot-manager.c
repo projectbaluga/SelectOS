@@ -10,26 +10,21 @@ static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
 static UINTN TestFsHandleCount;
-static VOID WriteTestDiagnostics(EFI_HANDLE ImageHandle) {
-    EFI_LOADED_IMAGE *Loaded = NULL;
-    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
-    EFI_FILE_HANDLE Root = NULL, File = NULL;
+static VOID WriteTestDiagnostics(VOID) {
+    EFI_HANDLE *Handles = NULL;
+    UINTN HandleCount = 0, i;
     EFI_STATUS Status;
     CHAR8 Buffer[128];
-    UINTN Length = 0, i;
+    UINTN Length = 0;
     const CHAR8 Prefix[] = "SELECTOS_MANAGER_STARTED\n";
     const CHAR8 Scan[] = "SCAN_HANDLES=";
     const CHAR8 EntriesText[] = "\nENTRIES=";
-    Status = uefi_call_wrapper(BS->HandleProtocol, 3, ImageHandle, &LoadedImageProtocol, (VOID **)&Loaded);
-    if (EFI_ERROR(Status) || Loaded == NULL) return;
-    Status = uefi_call_wrapper(BS->HandleProtocol, 3, Loaded->DeviceHandle, &SimpleFsGuid, (VOID **)&Fs);
-    if (EFI_ERROR(Status) || Fs == NULL) return;
-    Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
-    if (EFI_ERROR(Status) || Root == NULL) return;
+    Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid,
+                               NULL, &HandleCount, &Handles);
     for (i = 0; i + 1 < sizeof(Prefix); ++i) Buffer[Length++] = Prefix[i];
     for (i = 0; i + 1 < sizeof(Scan); ++i) Buffer[Length++] = Scan[i];
     {
-        CHAR8 Digits[24]; UINTN Count = 0, Value = TestFsHandleCount, j;
+        CHAR8 Digits[24]; UINTN Count = 0, Value = HandleCount, j;
         do { Digits[Count++] = (CHAR8)('0' + (Value % 10)); Value /= 10; } while (Value && Count < sizeof(Digits));
         for (j = Count; j > 0; --j) Buffer[Length++] = Digits[j - 1];
     }
@@ -40,15 +35,28 @@ static VOID WriteTestDiagnostics(EFI_HANDLE ImageHandle) {
         for (j = Count; j > 0; --j) Buffer[Length++] = Digits[j - 1];
     }
     Buffer[Length++] = '\n';
-    Status = uefi_call_wrapper(Root->Open, 5, Root, &File, L"\\selectos-debug.log",
-                               EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
-    if (!EFI_ERROR(Status) && File != NULL) {
-        uefi_call_wrapper(File->SetPosition, 2, File, 0);
-        uefi_call_wrapper(File->Write, 3, File, &Length, Buffer);
-        uefi_call_wrapper(File->Flush, 1, File);
-        uefi_call_wrapper(File->Close, 1, File);
+    if (!EFI_ERROR(Status) && Handles != NULL) {
+        for (i = 0; i < HandleCount; ++i) {
+            EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
+            EFI_FILE_HANDLE Root = NULL, File = NULL;
+            UINTN WriteLength = Length;
+            Status = uefi_call_wrapper(BS->HandleProtocol, 3, Handles[i], &SimpleFsGuid,
+                                       (VOID **)&Fs);
+            if (EFI_ERROR(Status) || Fs == NULL) continue;
+            Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
+            if (EFI_ERROR(Status) || Root == NULL) continue;
+            Status = uefi_call_wrapper(Root->Open, 5, Root, &File, L"\\selectos-debug.log",
+                                       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
+            if (!EFI_ERROR(Status) && File != NULL) {
+                uefi_call_wrapper(File->SetPosition, 2, File, 0);
+                uefi_call_wrapper(File->Write, 3, File, &WriteLength, Buffer);
+                uefi_call_wrapper(File->Flush, 1, File);
+                uefi_call_wrapper(File->Close, 1, File);
+            }
+            uefi_call_wrapper(Root->Close, 1, Root);
+        }
+        uefi_call_wrapper(BS->FreePool, 1, Handles);
     }
-    uefi_call_wrapper(Root->Close, 1, Root);
 }
 #endif
 static UINTN ConsoleWriteString(const CHAR16 *Text) {
@@ -308,9 +316,15 @@ static EFI_STATUS LaunchEntry(EFI_HANDLE ImageHandle, const BOOT_ENTRY *Entry) {
     return Status;
 }
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    if (SystemTable != NULL && SystemTable->ConOut != NULL) {
+        CHAR16 Marker[] = L"SELECTOS_MANAGER_ENTRYPOINT_REACHED\\r\\n";
+        uefi_call_wrapper(SystemTable->ConOut->OutputString, 2, SystemTable->ConOut, Marker);
+    }
+#endif
     InitializeLib(ImageHandle, SystemTable);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    WriteTestDiagnostics(ImageHandle);
+    WriteTestDiagnostics();
 #endif
     for (;;) {
         UINTN i, Selection;
@@ -321,7 +335,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         LocalPrint(L"Scanning UEFI-readable filesystem volumes...\r\n");
         ScanFilesystems();
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        WriteTestDiagnostics(ImageHandle);
+        WriteTestDiagnostics();
 #endif
         if (EntryCount == 0) {
             LocalPrint(L"\r\nNo supported EFI loader was found.\r\n");
