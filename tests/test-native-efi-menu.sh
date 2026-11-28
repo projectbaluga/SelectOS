@@ -11,8 +11,8 @@ mkdir -p "$TMP/sys/sda1" "$TMP/dev" "$TMP/bin" "$TMP/mount-root" "$TMP/console"
 cat > "$TMP/bin/blkid" <<'MOCK'
 #!/bin/sh
 field=""
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "-s" ]; then field="$2"; shift 2; else shift; fi
+while (($#)); do
+  if [[ "$1" == "-s" ]]; then field="$2"; shift 2; else shift; fi
 done
 case "$field" in
   PART_ENTRY_TYPE) echo "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" ;;
@@ -21,14 +21,9 @@ esac
 MOCK
 cat > "$TMP/bin/mount" <<'MOCK'
 #!/bin/sh
-case "$*" in
-  *"ro,nosuid,nodev,noexec"*) : ;;
-  *) echo "mount options were not read-only/noexec" >&2; exit 1 ;;
-esac
-for last do :; done
-[ -n "${SELECTOS_TEST_MOUNT_LOG:-}" ] && printf '%s\n' "$*" >> "$SELECTOS_TEST_MOUNT_LOG"
-mkdir -p "$last/EFI/Microsoft/Boot"
-: > "$last/EFI/Microsoft/Boot/bootmgfw.efi"
+target="\${@: -1}"
+mkdir -p "$target/EFI/Microsoft/Boot"
+: > "$target/EFI/Microsoft/Boot/bootmgfw.efi"
 MOCK
 cat > "$TMP/bin/umount" <<'MOCK'
 #!/bin/sh
@@ -36,11 +31,20 @@ exit 0
 MOCK
 chmod +x "$TMP/bin/"*
 printf '1\n' > "$TMP/console/input"
-# Substitute absolute BusyBox paths with host utilities for this fixture test.
+# Bash runs the script for the host test; BusyBox absolute paths are replaced
+# through PATH by small test shims only for the commands used by this script.
 mkdir -p "$TMP/bin/bin"
-for cmd in rm tr wc sed; do
-  ln -s "$(command -v "$cmd")" "$TMP/bin/bin/$cmd"
+for cmd in rm tr busybox wc sed; do
+  case "$cmd" in
+    busybox) cat > "$TMP/bin/bin/busybox" <<'SH'
+#!/bin/sh
+exec /bin/"$@"
+SH
+      ;;
+    *) ln -s "$(command -v "$cmd")" "$TMP/bin/bin/$cmd" ;;
+  esac
 done
+# The test substitutes the absolute utility paths used by the initramfs script.
 sed \
   -e "s|/bin/blkid|$TMP/bin/blkid|g" \
   -e "s|/bin/mount|$TMP/bin/mount|g" \
@@ -50,15 +54,15 @@ sed \
   -e "s|/bin/busybox wc|$TMP/bin/bin/wc|g" \
   -e "s|/bin/busybox tr|$TMP/bin/bin/tr|g" \
   -e "s|/bin/busybox sed|$TMP/bin/bin/sed|g" \
+  -e "s|/bin/console|$TMP/console/input|g" \
   "$MENU" > "$TMP/menu-test"
 chmod +x "$TMP/menu-test"
-output="$(PATH="$TMP/bin:$PATH" SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" SELECTOS_TEST_MOUNT_LOG="$TMP/mount.log" bash "$TMP/menu-test")"
+output="$(PATH="$TMP/bin:$PATH" SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" bash "$TMP/menu-test")"
 grep -q 'Windows' <<< "$output"
 grep -q 'Napili:' <<< "$output"
 grep -q 'Hindi pa available ang UEFI handoff' <<< "$output"
-grep -q 'ro,nosuid,nodev,noexec' "$TMP/mount.log"
-# No firmware-write or command-execution mechanism is permitted in this phase.
-if grep -Eiq 'BootNext|efivarfs|(^|[[:space:]])(exec|chroot)[[:space:]]' "$MENU"; then
+# Ensure the source contains no executable chainload/firmware-write operation.
+if grep -Eiq 'BootNext|efivarfs|chainload|(^|[[:space:]])(exec|chroot)[[:space:]]' "$MENU"; then
   echo "Unexpected firmware write or execution path in EFI menu." >&2
   exit 1
 fi

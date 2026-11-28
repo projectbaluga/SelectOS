@@ -58,7 +58,7 @@ jobs:
           mkdir -p "$WORK/source"
           gzip -dc "$SOURCE" > "$WORK/source.img"
           LOOP="$(sudo losetup --find --show --partscan "$WORK/source.img")"
-          PART="\${LOOP}p1"
+          PART="${LOOP}p1"
           for attempt in {1..10}; do
             [[ -b "$PART" ]] && break
             sleep 1
@@ -149,21 +149,21 @@ jobs:
     needs: build
     # Pull-request runs can come from forks and must not receive an Actions write token.
     # Cleanup runs after manual image builds, even if the build job fails.
-    if: \${{ always() && github.event_name != 'pull_request' }}
+    if: ${{ always() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
       - name: Delete previous completed workflow runs
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: \${{ github.repository }}
-          CURRENT_RUN_ID: \${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
         shell: bash
         run: |
           set -Eeuo pipefail
           echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/\${GH_REPO}/actions/runs?per_page=100" \\
+          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \\
             --jq '.workflow_runs[] | select(.status == "completed") | .id' |
           while IFS= read -r run_id; do
             [[ -n "$run_id" ]] || continue
@@ -171,5 +171,5 @@ jobs:
               continue
             fi
             echo "Deleting completed workflow run $run_id"
-            gh api --method DELETE "repos/\${GH_REPO}/actions/runs/\${run_id}"
+            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
           done
