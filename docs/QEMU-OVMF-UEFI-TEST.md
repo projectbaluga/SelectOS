@@ -18,3 +18,14 @@ newer SIMD instructions.
 
 The test uses a temporary GPT/FAT32 EFI System Partition image and does not
 modify host EFI variables or NVRAM. The production native image remains marked `PRODUCTION_READY=false`.
+
+
+### Failure diagnostics
+
+The QEMU harness compiles the boot manager with
+`SELECTOS_QEMU_TEST_DIAGNOSTICS`. This test-only build writes
+`selectos-debug.log` to the disposable ESP, recording that the manager
+started and how many UEFI Simple File System handles and supported loader
+entries it discovered. The normal image build does not define this macro and
+does not write this diagnostic file. When the child marker is missing, the
+test prints the diagnostic log if the manager was able to create it.
