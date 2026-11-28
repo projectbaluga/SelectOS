@@ -157,21 +157,21 @@ typedef struct {
 /* Use CHAR16 arrays initialized from narrow character constants for component
  * names. This avoids relying on compiler wchar_t layout for path traversal.
  */
-static const CHAR16 C_EFI[] = { 'E', 'F', 'I', 0 };
-static const CHAR16 C_MICROSOFT[] = { 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f', 't', 0 };
-static const CHAR16 C_BOOT[] = { 'B', 'o', 'o', 't', 0 };
-static const CHAR16 C_BOOTMGFW[] = { 'b', 'o', 'o', 't', 'm', 'g', 'f', 'w', '.', 'e', 'f', 'i', 0 };
-static const CHAR16 C_UBUNTU[] = { 'u', 'b', 'u', 'n', 't', 'u', 0 };
-static const CHAR16 C_DEBIAN[] = { 'd', 'e', 'b', 'i', 'a', 'n', 0 };
-static const CHAR16 C_FEDORA[] = { 'f', 'e', 'd', 'o', 'r', 'a', 0 };
-static const CHAR16 C_OPENSUSE[] = { 'o', 'p', 'e', 'n', 's', 'u', 's', 'e', 0 };
-static const CHAR16 C_SHIMX64[] = { 's', 'h', 'i', 'm', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
-static const CHAR16 C_GRUBX64[] = { 'g', 'r', 'u', 'b', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
-static const CHAR16 C_SHIM[] = { 's', 'h', 'i', 'm', '.', 'e', 'f', 'i', 0 };
-static const CHAR16 C_SYSTEMD[] = { 's', 'y', 's', 't', 'e', 'm', 'd', 0 };
-static const CHAR16 C_SYSTEMDBOOT[] = { 's', 'y', 's', 't', 'e', 'm', 'd', '-', 'b', 'o', 'o', 't', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
-static const CHAR16 C_REFIND[] = { 'r', 'e', 'f', 'i', 'n', 'd', 0 };
-static const CHAR16 C_REFINDX64[] = { 'r', 'e', 'f', 'i', 'n', 'd', '_', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
+static const CHAR16 C_EFI[] = L"EFI";
+static const CHAR16 C_MICROSOFT[] = L"Microsoft";
+static const CHAR16 C_BOOT[] = L"Boot";
+static const CHAR16 C_BOOTMGFW[] = L"bootmgfw.efi";
+static const CHAR16 C_UBUNTU[] = L"ubuntu";
+static const CHAR16 C_DEBIAN[] = L"debian";
+static const CHAR16 C_FEDORA[] = L"fedora";
+static const CHAR16 C_OPENSUSE[] = L"opensuse";
+static const CHAR16 C_SHIMX64[] = L"shimx64.efi";
+static const CHAR16 C_GRUBX64[] = L"grubx64.efi";
+static const CHAR16 C_SHIM[] = L"shim.efi";
+static const CHAR16 C_SYSTEMD[] = L"systemd";
+static const CHAR16 C_SYSTEMDBOOT[] = L"systemd-bootx64.efi";
+static const CHAR16 C_REFIND[] = L"refind";
+static const CHAR16 C_REFINDX64[] = L"refind_x64.efi";
 
 static const KNOWN_LOADER KnownLoaders[] = {
     { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager", { C_EFI, C_MICROSOFT, C_BOOT, C_BOOTMGFW }, 4 },
@@ -197,18 +197,18 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
     UINTN i;
     if (Root == NULL || Loader == NULL || Loader->ComponentCount == 0) return NULL;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    if (Loader == &KnownLoaders[2]) {
-        CHAR16 Marker[] = L"SELECTOS_PATH_ENTRY\r\n";
-        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
-    }
-#endif
-    /* Walk an explicit list of CHAR16 components, one directory at a time. */
-    for (i = 0; i < Loader->ComponentCount; ++i) {
-        EFI_STATUS OpenStatus;
-        const CHAR16 *Component = Loader->Components[i];
-        if (Component == NULL || Component[0] == 0) {
-            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
-            return NULL;
+        if (Loader == &KnownLoaders[2]) {
+            if (i == 0) { CHAR16 M[] = L"SELECTOS_COMPONENT_EFI\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            else if (i == 1) { CHAR16 M[] = L"SELECTOS_COMPONENT_UBUNTU\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            else if (i == 2) { CHAR16 M[] = L"SELECTOS_COMPONENT_GRUB\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            if (EFI_ERROR(OpenStatus) || Next == NULL) {
+                if (OpenStatus == EFI_NOT_FOUND) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_NOT_FOUND\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_ACCESS_DENIED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_ACCESS_DENIED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_OTHER\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            } else {
+                CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_OPENED\r\n";
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M);
+            }
         }
         Next = NULL;
         OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next,
