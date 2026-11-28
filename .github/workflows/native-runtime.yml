@@ -7,6 +7,8 @@ on:
       - "scripts/build-native-initramfs.sh"
       - "tests/test-native-init.sh"
       - "docs/NATIVE-RUNTIME-STATUS.md"
+      - "docs/CONTROL-CENTER-CONNECT.md"
+      - "auth/agent/**"
       - ".github/workflows/native-runtime.yml"
   push:
     branches: [main]
@@ -14,6 +16,7 @@ on:
       - "src/native-initramfs/**"
       - "scripts/build-native-initramfs.sh"
       - "tests/test-native-init.sh"
+      - "auth/agent/**"
       - ".github/workflows/native-runtime.yml"
 
 permissions:
