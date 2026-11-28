@@ -9,7 +9,6 @@ typedef struct { EFI_HANDLE Device; const CHAR16 *Path; const CHAR16 *Label; } B
 static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-static UINTN TestFsHandleCount;
 static VOID WriteTestDiagnostics(VOID) {
     EFI_HANDLE *Handles = NULL;
     UINTN HandleCount = 0, i;
