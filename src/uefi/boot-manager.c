@@ -174,17 +174,31 @@ static VOID ScanFilesystems(VOID) {
     EFI_STATUS Status;
     EntryCount = 0;
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    LocalPrint(L"SCAN_LOCATE_STATUS=%r HANDLE_COUNT=%u\\r\\n", Status, HandleCount);
+#endif
     if (EFI_ERROR(Status) || Handles == NULL) return;
     for (i = 0; i < HandleCount && EntryCount < MAX_BOOT_ENTRIES; ++i) {
         EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
         EFI_FILE_HANDLE Root = NULL;
         Status = uefi_call_wrapper(BS->HandleProtocol, 3, Handles[i], &SimpleFsGuid, (VOID **)&Fs);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        LocalPrint(L"SCAN_HANDLE=%u PROTOCOL_STATUS=%r\\r\\n", i, Status);
+#endif
         if (EFI_ERROR(Status) || Fs == NULL) continue;
         Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        LocalPrint(L"SCAN_HANDLE=%u OPEN_VOLUME_STATUS=%r\\r\\n", i, Status);
+#endif
         if (EFI_ERROR(Status) || Root == NULL) continue;
         for (j = 0; j < sizeof(KnownLoaders) / sizeof(KnownLoaders[0]); ++j) {
+            BOOLEAN Found;
             if (EntryCount >= MAX_BOOT_ENTRIES) break;
-            if (FileExists(Root, KnownLoaders[j].Path)) {
+            Found = FileExists(Root, KnownLoaders[j].Path);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+            if (Found) LocalPrint(L"SCAN_FOUND_HANDLE=%u PATH=%s\\r\\n", i, KnownLoaders[j].Path);
+#endif
+            if (Found) {
                 Entries[EntryCount].Device = Handles[i];
                 Entries[EntryCount].Path = KnownLoaders[j].Path;
                 Entries[EntryCount].Label = KnownLoaders[j].Label;
@@ -193,6 +207,9 @@ static VOID ScanFilesystems(VOID) {
         }
         uefi_call_wrapper(Root->Close, 1, Root);
     }
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    LocalPrint(L"SCAN_ENTRY_COUNT=%u\\r\\n", EntryCount);
+#endif
     uefi_call_wrapper(BS->FreePool, 1, Handles);
 }
 static UINTN ReadSelection(VOID) {
