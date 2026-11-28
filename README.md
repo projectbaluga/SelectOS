@@ -45,6 +45,15 @@ The output is `dist/SelectOS.img`, a 512 MiB FAT32 UEFI image. The explicit opt-
 
 **Do not write a legacy artifact to a production USB expecting the Gbox login to be gone.**
 
+### Experimental native image artifact
+
+The image workflow also builds a separate `SelectOS-native-experimental` artifact
+from the source-controlled native initramfs. It reaches a diagnostic PID 1
+console only; the integrated OS selector, in-initramfs EFI discovery, and UEFI
+handoff are not implemented yet. Its manifest is marked
+`PRODUCTION_READY=false`. Do not use it as a replacement for a working
+multi-boot system. See [the experimental native image build guide](docs/EXPERIMENTAL-NATIVE-IMAGE.md).
+
 ## Server management dashboard
 
 The LAN-only SelectOS Control Center is served by the Debian Go server at `/dashboard`. It includes administrator access, host health metrics, a device registry with per-device enrollment tokens and heartbeat agent, audit events, and PostgreSQL backup inventory/scripts. See [docs/CONTROL-CENTER.md](docs/CONTROL-CENTER.md) for deployment, TLS, enrollment, and recovery instructions. The dashboard is separate from PC boot authentication; it does not add a login requirement to SelectOS boot.
