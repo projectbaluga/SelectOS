@@ -225,6 +225,14 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
             if (EFI_ERROR(OpenStatus) || Next == NULL) {
                 if (OpenStatus == EFI_NOT_FOUND) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_NOT_FOUND\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
                 else if (OpenStatus == EFI_ACCESS_DENIED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_ACCESS_DENIED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_INVALID_PARAMETER) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_INVALID_PARAMETER\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_UNSUPPORTED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_UNSUPPORTED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_DEVICE_ERROR) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_DEVICE_ERROR\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_NO_MEDIA) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_NO_MEDIA\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_MEDIA_CHANGED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_MEDIA_CHANGED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_TIMEOUT) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_TIMEOUT\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_COMPROMISED_DATA) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_COMPROMISED_DATA\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_SUCCESS && Next == NULL) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_SUCCESS_NULL_HANDLE\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
                 else { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_OTHER\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             } else {
                 CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_OPENED\r\n";
