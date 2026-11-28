@@ -60,6 +60,9 @@ jobs:
             [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
+      - name: Validate image builder syntax
+        run: bash -n scripts/build-image.sh
+
       - name: Build explicitly marked legacy image
         env:
           SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
