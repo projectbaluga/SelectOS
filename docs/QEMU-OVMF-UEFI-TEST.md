@@ -40,4 +40,8 @@ test prints the diagnostic log if the manager was able to create it.
 
 ### Current debugging observation
 
-The latest completed attempt (workflow run #74) confirms that GRUB reads the SelectOS EFI file from the expected (hd0) path and accepts the chainloader command. The manager then reaches its entrypoint, completes GNU-EFI initialization, returns from its diagnostic routine, completes the filesystem scan, and returns from post-scan diagnostics. However, no test child handoff marker is created, and the run ends with EFI status 14 (EFI_NOT_FOUND). The immediate question is therefore whether the scan sees any Simple File System handles and whether the allowlisted child path is found. The test-only build now prints LocateHandleBuffer status, handle count, per-handle protocol/OpenVolume statuses, matched loader paths, and final entry count to the serial console. These diagnostics are not enabled in the normal image build.
+- Workflow run #74 confirmed that the manager reached its entrypoint, completed GNU-EFI initialization, and returned from filesystem scanning and post-scan diagnostics. The application then returned EFI status 14 (`EFI_NOT_FOUND`) without creating the child marker.
+- A follow-up attempt added variadic `LocalPrint` calls inside the scanner. Run #76 reached initialization but did not emit the post-scan marker, so those extra formatter calls were removed from the test-only scan path.
+- The current test-only scan diagnostics use direct UEFI `OutputString` markers to distinguish: `LocateHandleBuffer` failure, no Simple File System handles, handles found, protocol/open-volume failures, a matched allowlisted loader, and zero/nonzero entry count.
+- Runs #75 and #76 did not complete the child handoff. Runs #77 and #78 are validating the direct-marker instrumentation and the corrected diagnostic string escapes.
+- No successful `LoadImage`/`StartImage` handoff is claimed yet.
