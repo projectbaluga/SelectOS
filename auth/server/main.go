@@ -52,6 +52,7 @@ func main() {
 	mux.HandleFunc("POST /v1/admin/users", s.auth(s.admin(s.createUser)))
 	mux.HandleFunc("PATCH /v1/admin/users/{id}/status", s.auth(s.admin(s.setUserStatus)))
 	mux.HandleFunc("POST /v1/admin/users/{id}/password", s.auth(s.admin(s.resetPassword)))
+	registerControlCenter(s, mux)
 
 	srv := &http.Server{Addr:addr, Handler:securityHeaders(mux), ReadHeaderTimeout:5*time.Second, ReadTimeout:10*time.Second, WriteTimeout:15*time.Second, IdleTimeout:60*time.Second}
 	log.Printf("SelectOS auth server listening on %s", addr)
