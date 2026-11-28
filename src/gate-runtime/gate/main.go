@@ -178,18 +178,18 @@ func runGUI(dry bool, cfg *Config) bool {
 
 func runText(dry bool) {
 	in := bufio.NewReader(os.Stdin)
-	fmt.Println("=== NCF CCS Lab Gate ===")
+	fmt.Println("=== SelectOS OS Selector ===")
 	email := ""
 	for {
-		fmt.Print("gbox email: ")
+		fmt.Print("Gbox username: ")
 		line, _ := in.ReadString('\n')
 		email = strings.ToLower(strings.TrimSpace(line))
 		if strings.HasSuffix(email, allowedSuffix) {
 			break
 		}
-		fmt.Println("Gbox email lang po (" + allowedSuffix + ")")
+		fmt.Println("Use your Gbox username with the configured domain (" + allowedSuffix + ").")
 	}
-	fmt.Println("Hello,", email)
+	fmt.Println("Hello,", strings.TrimSuffix(email, allowedSuffix))
 	entries, err := ListBootEntries()
 	if err != nil || len(entries) == 0 {
 		fmt.Println("Walang boot entries:", err)
