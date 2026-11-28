@@ -3,15 +3,15 @@
 # This intentionally records a choice only; it never executes an EFI binary.
 PATH=/bin:/sbin
 export PATH
-SYS_BLOCK="\${SELECTOS_SYS_BLOCK:-/sys/class/block}"
-DEV_ROOT="\${SELECTOS_DEV_ROOT:-/dev}"
-MOUNT_ROOT="\${SELECTOS_MOUNT_ROOT:-/run/selectos-efi}"
-CONSOLE="\${SELECTOS_CONSOLE:-/dev/console}"
-BLKID="\${SELECTOS_BLKID:-/bin/blkid}"
-MOUNT="\${SELECTOS_MOUNT:-/bin/mount}"
-UMOUNT="\${SELECTOS_UMOUNT:-/bin/umount}"
+SYS_BLOCK="${SELECTOS_SYS_BLOCK:-/sys/class/block}"
+DEV_ROOT="${SELECTOS_DEV_ROOT:-/dev}"
+MOUNT_ROOT="${SELECTOS_MOUNT_ROOT:-/run/selectos-efi}"
+CONSOLE="${SELECTOS_CONSOLE:-/dev/console}"
+BLKID="${SELECTOS_BLKID:-/bin/blkid}"
+MOUNT="${SELECTOS_MOUNT:-/bin/mount}"
+UMOUNT="${SELECTOS_UMOUNT:-/bin/umount}"
 ESP_GUID="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
-WORK="\${MOUNT_ROOT}.$$"
+WORK="${MOUNT_ROOT}.$$"
 ENTRIES="$WORK/entries"
 COUNT=0
 
@@ -20,11 +20,16 @@ cleanup() {
   # Every mount target is unmounted immediately after inspection. This is a
   # final best-effort guard for an interrupted scan.
   if [ -d "$WORK" ]; then
+    mounted=0
     for target in "$WORK"/*; do
       [ -d "$target" ] || continue
-      "$UMOUNT" "$target" 2>/dev/null || true
+      if ! "$UMOUNT" "$target" 2>/dev/null; then mounted=1; fi
     done
-    /bin/rm -rf "$WORK"
+    if [ "$mounted" -eq 0 ]; then
+      /bin/rm -rf "$WORK"
+    else
+      say "WARNING: could not unmount a read-only ESP; leaving its temporary mount directory intact."
+    fi
   fi
 }
 trap cleanup EXIT HUP INT TERM
@@ -36,7 +41,7 @@ mkdir -p "$WORK" "$MOUNT_ROOT" || { say "Cannot create temporary scan directory.
 
 for node in "$SYS_BLOCK"/*; do
   [ -f "$node/partition" ] || continue
-  name=\${node##*/}
+  name=${node##*/}
   case "$name" in loop*|ram*) continue ;; esac
   device="$DEV_ROOT/$name"
   [ -b "$device" ] || [ -e "$device" ] || continue
@@ -76,7 +81,7 @@ for node in "$SYS_BLOCK"/*; do
 done
 
 COUNT=$(/bin/busybox wc -l < "$ENTRIES" | /bin/busybox tr -d ' ')
-if [ "\${COUNT:-0}" -eq 0 ]; then
+if [ "${COUNT:-0}" -eq 0 ]; then
   say "Walang kilalang EFI loader na nakita; walang binagong disk o firmware setting."
   exit 0
 fi
@@ -105,7 +110,7 @@ esac
   say "Wala sa listahan ang pinili; walang binagong boot setting."
   exit 0
 }
-selected=$( /bin/busybox sed -n "\${choice}p" "$ENTRIES" )
+selected=$( /bin/busybox sed -n "${choice}p" "$ENTRIES" )
 say "Napili: $selected"
 say "Hindi pa available ang UEFI handoff; walang EFI program na inilunsad."
 say "Bumabalik sa diagnostic console."

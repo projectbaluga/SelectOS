@@ -21,7 +21,12 @@ esac
 MOCK
 cat > "$TMP/bin/mount" <<'MOCK'
 #!/bin/sh
+case "$*" in
+  *"ro,nosuid,nodev,noexec"*) : ;;
+  *) echo "mount options were not read-only/noexec" >&2; exit 1 ;;
+esac
 for last do :; done
+[ -n "${SELECTOS_TEST_MOUNT_LOG:-}" ] && printf '%s\n' "$*" >> "$SELECTOS_TEST_MOUNT_LOG"
 mkdir -p "$last/EFI/Microsoft/Boot"
 : > "$last/EFI/Microsoft/Boot/bootmgfw.efi"
 MOCK
@@ -47,10 +52,11 @@ sed \
   -e "s|/bin/busybox sed|$TMP/bin/bin/sed|g" \
   "$MENU" > "$TMP/menu-test"
 chmod +x "$TMP/menu-test"
-output="$(PATH="$TMP/bin:$PATH" SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" bash "$TMP/menu-test")"
+output="$(PATH="$TMP/bin:$PATH" SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" SELECTOS_TEST_MOUNT_LOG="$TMP/mount.log" bash "$TMP/menu-test")"
 grep -q 'Windows' <<< "$output"
 grep -q 'Napili:' <<< "$output"
 grep -q 'Hindi pa available ang UEFI handoff' <<< "$output"
+grep -q 'ro,nosuid,nodev,noexec' "$TMP/mount.log"
 # No firmware-write or command-execution mechanism is permitted in this phase.
 if grep -Eiq 'BootNext|efivarfs|(^|[[:space:]])(exec|chroot)[[:space:]]' "$MENU"; then
   echo "Unexpected firmware write or execution path in EFI menu." >&2
