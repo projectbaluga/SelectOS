@@ -157,21 +157,21 @@ typedef struct {
 /* Use CHAR16 arrays initialized from narrow character constants for component
  * names. This avoids relying on compiler wchar_t layout for path traversal.
  */
-static const CHAR16 C_EFI[] = L"EFI";
-static const CHAR16 C_MICROSOFT[] = L"Microsoft";
-static const CHAR16 C_BOOT[] = L"Boot";
-static const CHAR16 C_BOOTMGFW[] = L"bootmgfw.efi";
-static const CHAR16 C_UBUNTU[] = L"ubuntu";
-static const CHAR16 C_DEBIAN[] = L"debian";
-static const CHAR16 C_FEDORA[] = L"fedora";
-static const CHAR16 C_OPENSUSE[] = L"opensuse";
-static const CHAR16 C_SHIMX64[] = L"shimx64.efi";
-static const CHAR16 C_GRUBX64[] = L"grubx64.efi";
-static const CHAR16 C_SHIM[] = L"shim.efi";
-static const CHAR16 C_SYSTEMD[] = L"systemd";
-static const CHAR16 C_SYSTEMDBOOT[] = L"systemd-bootx64.efi";
-static const CHAR16 C_REFIND[] = L"refind";
-static const CHAR16 C_REFINDX64[] = L"refind_x64.efi";
+static const CHAR16 C_EFI[] = L"\\EFI";
+static const CHAR16 C_MICROSOFT[] = L"\\EFI\\Microsoft";
+static const CHAR16 C_BOOT[] = L"\\EFI\\Microsoft\\Boot";
+static const CHAR16 C_BOOTMGFW[] = L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi";
+static const CHAR16 C_UBUNTU[] = L"\\EFI\\ubuntu";
+static const CHAR16 C_DEBIAN[] = L"\\EFI\\debian";
+static const CHAR16 C_FEDORA[] = L"\\EFI\\fedora";
+static const CHAR16 C_OPENSUSE[] = L"\\EFI\\opensuse";
+static const CHAR16 C_SHIMX64[] = L"\\EFI\\ubuntu\\shimx64.efi";
+static const CHAR16 C_GRUBX64[] = L"\\EFI\\ubuntu\\grubx64.efi";
+static const CHAR16 C_SHIM[] = L"\\EFI\\opensuse\\shim.efi";
+static const CHAR16 C_SYSTEMD[] = L"\\EFI\\systemd";
+static const CHAR16 C_SYSTEMDBOOT[] = L"\\EFI\\systemd\\systemd-bootx64.efi";
+static const CHAR16 C_REFIND[] = L"\\EFI\\refind";
+static const CHAR16 C_REFINDX64[] = L"\\EFI\\refind\\refind_x64.efi";
 
 static const KNOWN_LOADER KnownLoaders[] = {
     { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager", { C_EFI, C_MICROSOFT, C_BOOT, C_BOOTMGFW }, 4 },
@@ -202,7 +202,7 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
-    /* Walk an explicit list of CHAR16 components, one directory at a time. */
+    /* Open explicit absolute path prefixes from the volume root. */
     for (i = 0; i < Loader->ComponentCount; ++i) {
         EFI_FILE_HANDLE Next = NULL;
         EFI_STATUS OpenStatus;
@@ -218,7 +218,7 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
             else if (i == 2) { CHAR16 M[] = L"SELECTOS_COMPONENT_GRUB\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
         }
 #endif
-        OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next,
+        OpenStatus = uefi_call_wrapper(Root->Open, 5, Root, &Next,
                                        (CHAR16 *)Component, EFI_FILE_MODE_READ, 0);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (Loader == &KnownLoaders[2]) {
