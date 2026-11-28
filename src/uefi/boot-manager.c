@@ -19,6 +19,10 @@ static VOID WriteTestDiagnostics(VOID) {
     const CHAR8 Scan[] = "SCAN_HANDLES=";
     const CHAR8 EntriesText[] = "\nENTRIES=";
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid,
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    ConsoleWriteString(L"SELECTOS_DIAG_FS_STATUS="); ConsoleWriteHex((UINTN)Status); ConsoleWriteString(L"\r\n");
+    ConsoleWriteString(L"SELECTOS_DIAG_FS_COUNT="); ConsoleWriteNumber(HandleCount); ConsoleWriteString(L"\r\n");
+#endif
                                NULL, &HandleCount, &Handles);
     for (i = 0; i + 1 < sizeof(Prefix); ++i) Buffer[Length++] = Prefix[i];
     for (i = 0; i + 1 < sizeof(Scan); ++i) Buffer[Length++] = Scan[i];
@@ -181,6 +185,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
      */
     while (Path[i] == L'\\' || Path[i] == L'/') ++i;
     for (;;) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        { CHAR16 Marker[] = L"SELECTOS_LOOP_ENTERED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+#endif
         j = 0;
         while (Path[i] != 0 && Path[i] != L'\\' && Path[i] != L'/') {
             if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
