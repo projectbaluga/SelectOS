@@ -147,17 +147,43 @@ static UINTN LocalPrint(const CHAR16 *Format, ...) {
     Buffer[Length] = 0;
     return ConsoleWriteString(Buffer);
 }
-static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] = {
-    { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager" },
-    { L"/EFI/ubuntu/shimx64.efi", L"Ubuntu (shim)" },
-    { L"/EFI/ubuntu/grubx64.efi", L"Ubuntu (GRUB)" },
-    { L"/EFI/debian/shimx64.efi", L"Debian (shim)" },
-    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)" },
-    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)" },
-    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)" },
-    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)" },
-    { L"/EFI/systemd/systemd-bootx64.efi", L"systemd-boot" },
-    { L"/EFI/refind/refind_x64.efi", L"rEFInd" }
+typedef struct {
+    const CHAR16 *Path;
+    const CHAR16 *Label;
+    const CHAR16 *Components[4];
+    UINTN ComponentCount;
+} KNOWN_LOADER;
+
+/* Use CHAR16 arrays initialized from narrow character constants for component
+ * names. This avoids relying on compiler wchar_t layout for path traversal.
+ */
+static const CHAR16 C_EFI[] = { 'E', 'F', 'I', 0 };
+static const CHAR16 C_MICROSOFT[] = { 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f', 't', 0 };
+static const CHAR16 C_BOOT[] = { 'B', 'o', 'o', 't', 0 };
+static const CHAR16 C_BOOTMGFW[] = { 'b', 'o', 'o', 't', 'm', 'g', 'f', 'w', '.', 'e', 'f', 'i', 0 };
+static const CHAR16 C_UBUNTU[] = { 'u', 'b', 'u', 'n', 't', 'u', 0 };
+static const CHAR16 C_DEBIAN[] = { 'd', 'e', 'b', 'i', 'a', 'n', 0 };
+static const CHAR16 C_FEDORA[] = { 'f', 'e', 'd', 'o', 'r', 'a', 0 };
+static const CHAR16 C_OPENSUSE[] = { 'o', 'p', 'e', 'n', 's', 'u', 's', 'e', 0 };
+static const CHAR16 C_SHIMX64[] = { 's', 'h', 'i', 'm', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
+static const CHAR16 C_GRUBX64[] = { 'g', 'r', 'u', 'b', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
+static const CHAR16 C_SHIM[] = { 's', 'h', 'i', 'm', '.', 'e', 'f', 'i', 0 };
+static const CHAR16 C_SYSTEMD[] = { 's', 'y', 's', 't', 'e', 'm', 'd', 0 };
+static const CHAR16 C_SYSTEMDBOOT[] = { 's', 'y', 's', 't', 'e', 'm', 'd', '-', 'b', 'o', 'o', 't', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
+static const CHAR16 C_REFIND[] = { 'r', 'e', 'f', 'i', 'n', 'd', 0 };
+static const CHAR16 C_REFINDX64[] = { 'r', 'e', 'f', 'i', 'n', 'd', '_', 'x', '6', '4', '.', 'e', 'f', 'i', 0 };
+
+static const KNOWN_LOADER KnownLoaders[] = {
+    { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager", { C_EFI, C_MICROSOFT, C_BOOT, C_BOOTMGFW }, 4 },
+    { L"/EFI/ubuntu/shimx64.efi", L"Ubuntu (shim)", { C_EFI, C_UBUNTU, C_SHIMX64 }, 3 },
+    { L"/EFI/ubuntu/grubx64.efi", L"Ubuntu (GRUB)", { C_EFI, C_UBUNTU, C_GRUBX64 }, 3 },
+    { L"/EFI/debian/shimx64.efi", L"Debian (shim)", { C_EFI, C_DEBIAN, C_SHIMX64 }, 3 },
+    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)", { C_EFI, C_DEBIAN, C_GRUBX64 }, 3 },
+    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)", { C_EFI, C_FEDORA, C_SHIMX64 }, 3 },
+    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)", { C_EFI, C_FEDORA, C_GRUBX64 }, 3 },
+    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)", { C_EFI, C_OPENSUSE, C_SHIM }, 3 },
+    { L"/EFI/systemd/systemd-bootx64.efi", L"systemd-boot", { C_EFI, C_SYSTEMD, C_SYSTEMDBOOT }, 3 },
+    { L"/EFI/refind/refind_x64.efi", L"rEFInd", { C_EFI, C_REFIND, C_REFINDX64 }, 3 }
 };
 
 static VOID PauseForKey(VOID) {
@@ -165,86 +191,65 @@ static VOID PauseForKey(VOID) {
     while (uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key) == EFI_NOT_READY)
         uefi_call_wrapper(BS->Stall, 1, 100000);
 }
-static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
+static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER *Loader) {
     EFI_FILE_HANDLE Current = Root, Next = NULL;
-    CHAR16 Component[256];
-    UINTN i = 0, j = 0;
     BOOLEAN OwnsCurrent = FALSE;
-    if (Root == NULL || Path == NULL) return NULL;
+    UINTN i;
+    if (Root == NULL || Loader == NULL || Loader->ComponentCount == 0) return NULL;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_ENTRY\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-        if (Path == KnownLoaders[2].Path) {
-            ConsoleWriteString(L"SELECTOS_PATH_CODE_UNITS=");
-            ConsoleWriteHex(Path[0]); ConsoleWriteString(L",");
-            ConsoleWriteHex(Path[1]); ConsoleWriteString(L",");
-            ConsoleWriteHex(Path[2]); ConsoleWriteString(L",");
-            ConsoleWriteHex(Path[3]); ConsoleWriteString(L",");
-            ConsoleWriteHex(Path[4]); ConsoleWriteString(L"\r\n");
-        }
-    if (Path == KnownLoaders[2].Path && Path[0] == (CHAR16)0x002f) { CHAR16 M[] = L"SELECTOS_PATH0_SLASH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-    if (Path == KnownLoaders[2].Path && Path[1] == (CHAR16)0x0045) { CHAR16 M[] = L"SELECTOS_PATH1_E\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-    if (Path == KnownLoaders[2].Path && Path[4] == (CHAR16)0x002f) { CHAR16 M[] = L"SELECTOS_PATH4_SLASH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+    if (Loader == &KnownLoaders[2]) {
+        CHAR16 Marker[] = L"SELECTOS_PATH_ENTRY\r\n";
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+    }
 #endif
-
-    /* Walk one component at a time. This avoids firmware-specific differences
-     * in how root handles parse multi-component absolute/relative paths.
-     */
-    while (Path[i] == (CHAR16)0x005c || Path[i] == (CHAR16)0x002f) ++i;
-    for (;;) {
-        j = 0;
-        while (Path[i] != 0 && Path[i] != (CHAR16)0x005c && Path[i] != (CHAR16)0x002f) {
-            if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-                if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_TOO_LONG\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-#endif
-                if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
-                return NULL;
-            }
-            Component[j++] = Path[i++];
-        }
-        if (j == 0) {
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-            if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_EMPTY_COMPONENT\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-#endif
+    /* Walk an explicit list of CHAR16 components, one directory at a time. */
+    for (i = 0; i < Loader->ComponentCount; ++i) {
+        EFI_STATUS OpenStatus;
+        const CHAR16 *Component = Loader->Components[i];
+        if (Component == NULL || Component[0] == 0) {
             if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
             return NULL;
         }
-        Component[j] = 0;
         Next = NULL;
-        {
-            EFI_STATUS OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next, Component,
-                                                       EFI_FILE_MODE_READ, 0);
+        OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next,
+                                       (CHAR16 *)Component, EFI_FILE_MODE_READ, 0);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-            if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_OPEN_RETURNED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-#endif
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        if (Loader == &KnownLoaders[2]) {
             if (EFI_ERROR(OpenStatus) || Next == NULL) {
-                ConsoleWriteString(L"SELECTOS_COMPONENT_OPEN_FAILED: ");
-                ConsoleWriteString(Component);
-                ConsoleWriteString(L" status=");
+                CHAR16 Failed[] = L"SELECTOS_COMPONENT_OPEN_FAILED: ";
+                CHAR16 StatusText[] = L" status=";
+                CHAR16 Newline[] = L"\r\n";
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Failed);
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, (CHAR16 *)Component);
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, StatusText);
                 ConsoleWriteHex((UINTN)OpenStatus);
-                ConsoleWriteString(L"\r\n");
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Newline);
+            } else {
+                CHAR16 Opened[] = L"SELECTOS_PATH_COMPONENT_OPENED\r\n";
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Opened);
             }
+        }
 #endif
-            if (EFI_ERROR(OpenStatus) || Next == NULL) {
-                if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
-                return NULL;
-            }
+        if (EFI_ERROR(OpenStatus) || Next == NULL) {
+            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+            return NULL;
         }
         if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
         Current = Next;
         OwnsCurrent = TRUE;
-    while (Path[i] == (CHAR16)0x005c || Path[i] == (CHAR16)0x002f) ++i;
-        if (Path[i] == 0) return Current;
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_FINAL_OPENED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-#endif
     }
-}
-static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
-    EFI_FILE_HANDLE File = OpenPathFromRoot(Root, Path);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    if (Path == KnownLoaders[2].Path) {
+    if (Loader == &KnownLoaders[2]) {
+        CHAR16 Marker[] = L"SELECTOS_PATH_FINAL_OPENED\r\n";
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+    }
+#endif
+    return Current;
+}
+static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const KNOWN_LOADER *Loader) {
+    EFI_FILE_HANDLE File = OpenPathFromRoot(Root, Loader);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    if (Loader == &KnownLoaders[2]) {
         CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\r\n";
         CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n";
         if (File != NULL) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
@@ -285,7 +290,7 @@ static VOID ScanVolume(EFI_HANDLE Device) {
 #endif
     for (j = 0; j < sizeof(KnownLoaders) / sizeof(KnownLoaders[0]); ++j) {
         if (EntryCount >= MAX_BOOT_ENTRIES) break;
-        if (FileExists(Root, KnownLoaders[j].Path)) {
+        if (FileExists(Root, &KnownLoaders[j])) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
             CHAR16 Marker[] = L"SELECTOS_SCAN_ALLOWLISTED_LOADER_FOUND\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
