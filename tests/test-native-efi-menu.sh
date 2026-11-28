@@ -44,6 +44,7 @@ for cmd in rm tr wc sed; do
   ln -s "$(command -v "$cmd")" "$TMP/bin/bin/$cmd"
 done
 sed \
+  -e "s|/sbin/blkid|$TMP/bin/blkid|g" \
   -e "s|/bin/blkid|$TMP/bin/blkid|g" \
   -e "s|/bin/mount|$TMP/bin/mount|g" \
   -e "s|/bin/umount|$TMP/bin/umount|g" \
