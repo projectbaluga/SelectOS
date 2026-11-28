@@ -1,9 +1,14 @@
-name: Build legacy-compatible SelectOS image
+name: Build SelectOS images
 
 on:
   pull_request:
     paths:
       - "scripts/build-image.sh"
+      - "scripts/build-native-initramfs.sh"
+      - "scripts/build-native-image.sh"
+      - "src/native-initramfs/**"
+      - "tests/test-native-image-builder.sh"
+      - "docs/EXPERIMENTAL-NATIVE-IMAGE.md"
       - ".github/workflows/build-image.yml"
       - "config/**"
       - "boot/**"
@@ -16,7 +21,7 @@ permissions:
 
 jobs:
   build:
-    name: Build legacy Gate runtime image (login remains)
+    name: Build legacy and experimental native images
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -25,9 +30,9 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y parted dosfstools util-linux gzip
+          sudo apt-get install -y parted dosfstools util-linux gzip cpio busybox-static coreutils file
 
-      - name: Extract legacy boot files
+      - name: Extract kernel and UEFI boot files from compatibility source
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -41,7 +46,7 @@ jobs:
               sudo umount "$WORK/source" 2>/dev/null || true
               sudo losetup -d "$LOOP" 2>/dev/null || true
             fi
-            rm -rf "$WORK"
+            rm -rf -- "$WORK"
           }
           trap cleanup EXIT
           mkdir -p "$WORK/source"
@@ -64,26 +69,58 @@ jobs:
           sudo cp "$WORK/source/EFI/BOOT/GRUBX64.EFI" EFI/BOOT/grubx64.efi
           sudo cp "$WORK/source/EFI/BOOT/MMX64.EFI" EFI/BOOT/mmx64.efi
           sudo chown -R "$USER:$USER" boot EFI
-          for file in boot/vmlinuz boot/select.img EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
+          for file in boot/vmlinuz EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
             [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
-      - name: Validate image builder syntax
-        run: bash -n scripts/build-image.sh
+      - name: Validate image builder syntax and safety
+        run: |
+          bash -n scripts/build-image.sh
+          bash -n scripts/build-native-initramfs.sh
+          bash -n scripts/build-native-image.sh
+          bash -n tests/test-native-image-builder.sh
+          bash tests/test-native-image-builder.sh
 
-      - name: Build explicitly marked legacy image
+      - name: Build native experimental initramfs
+        run: sudo bash scripts/build-native-initramfs.sh
+
+      - name: Package native experimental image
+        env:
+          SELECTOS_BUILD_NATIVE_EXPERIMENTAL: "1"
+        run: sudo --preserve-env=SELECTOS_BUILD_NATIVE_EXPERIMENTAL bash scripts/build-native-image.sh
+
+      - name: Verify native image manifest and checksum
+        run: |
+          test -s dist/native/select-native.img
+          test -s dist/native/SelectOS-native-experimental.img
+          grep -q '^PRODUCTION_READY=false$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^RUNTIME=native-initramfs-bringup$' dist/native/IMAGE-BUILD-INFO.txt
+          sha256sum --check dist/native/IMAGE-SHA256SUMS
+
+      - name: Build explicitly marked legacy compatibility image
         env:
           SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
         run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
 
-      - name: Verify image and legacy warning manifest
+      - name: Verify legacy image and warning manifest
         run: |
           test -s dist/SelectOS.img
           grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
           grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
           file dist/SelectOS.img
 
-      - name: Upload legacy image artifact
+      - name: Upload experimental native image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-native-experimental
+          path: |
+            dist/native/SelectOS-native-experimental.img
+            dist/native/IMAGE-BUILD-INFO.txt
+            dist/native/IMAGE-SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload legacy compatibility image artifact
         uses: actions/upload-artifact@v4
         with:
           name: SelectOS-legacy-Gate-runtime
