@@ -13,6 +13,8 @@ grep -q 'selectos-debug.log' "$SRC"
 grep -q 'L"selectos-debug.log"' "$SRC"
 grep -q 'SELECTOS_SCAN_RETURNED' "$SRC"
 grep -q 'BuildFileDevicePath' "$SRC"
+grep -q 'OpenPathFromRoot' "$SRC"
+grep -q 'Walk one component at a time' "$SRC"
 grep -q 'LocalPrint' "$SRC"
 if grep -Eq '(^|[^[:alnum:]_])Print[[:space:]]*\(' "$SRC"; then
   echo "UEFI loader must not call GNU-EFI Print/CatPrint." >&2
