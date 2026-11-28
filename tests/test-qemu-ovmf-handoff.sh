@@ -75,6 +75,7 @@ cmd = [
 ]
 proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.settimeout(10)
 try:
     deadline = time.time() + 20
     while time.time() < deadline:
@@ -111,7 +112,7 @@ try:
         qmp("human-monitor-command", {"command-line": "sendkey 1"})
         time.sleep(0.3)
         qmp("human-monitor-command", {"command-line": "sendkey ret"})
-    except (BrokenPipeError, ConnectionResetError):
+    except (BrokenPipeError, ConnectionResetError, TimeoutError):
         # The FAT marker is the authoritative assertion that the selected child ran.
         pass
     # The child app writes a marker to the same FAT volume before returning.
