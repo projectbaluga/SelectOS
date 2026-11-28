@@ -68,7 +68,10 @@ cp "$ROOT/EFI/BOOT/grubx64.efi" "$WORK/BOOTX64.EFI"
 cat > "$WORK/grub.cfg" <<'GRUB'
 set timeout=0
 set default=0
+echo SELECTOS_OVMF_GRUB_CONFIG_LOADED
 set root=(hd0)
+echo SELECTOS_GRUB_ROOT=$root
+ls /EFI/SelectOS/
 chainloader /EFI/SelectOS/selectos.efi
 boot
 GRUB
