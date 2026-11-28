@@ -123,9 +123,11 @@ func (s *Server) overview(w http.ResponseWriter,r *http.Request,c claims) {
 	_ = s.db.QueryRow("SELECT COUNT(*) FROM devices WHERE enabled=TRUE AND last_seen > CURRENT_TIMESTAMP - INTERVAL '2 minutes'").Scan(&online)
 	var users int; _ = s.db.QueryRow("SELECT COUNT(*) FROM users WHERE enabled=TRUE").Scan(&users)
 	m:=hostMetrics()
+	var databaseBytes int64; _ = s.db.QueryRow("SELECT pg_database_size(current_database())").Scan(&databaseBytes)
+	m["database_size_bytes"]=databaseBytes
 	write(w,200,response{"server":m,"devices":response{"registered":devices,"online":online,"offline":devices-online},"users_enabled":users,"database":"connected","as_of":time.Now().UTC()})
 }
-func (s *Server) metrics(w http.ResponseWriter,r *http.Request,c claims) { write(w,200,hostMetrics()) }
+func (s *Server) metrics(w http.ResponseWriter,r *http.Request,c claims) { m:=hostMetrics(); var size int64; if err:=s.db.QueryRow("SELECT pg_database_size(current_database())").Scan(&size); err==nil { m["database_size_bytes"]=size }; write(w,200,m) }
 func hostMetrics() response {
 	out:=response{"hostname":hostname(),"os":runtime.GOOS,"architecture":runtime.GOARCH,"go_version":runtime.Version(),"cpus":runtime.NumCPU(),"as_of":time.Now().UTC()}
 	if b,err:=os.ReadFile("/proc/meminfo"); err==nil {
@@ -137,6 +139,7 @@ func hostMetrics() response {
 	var st syscall.Statfs_t
 	if err:=syscall.Statfs("/",&st); err==nil && st.Blocks>0 { used:=st.Blocks-st.Bfree; out["disk_total_gb"]=uint64(st.Blocks)*uint64(st.Bsize)/1024/1024/1024; out["disk_used_percent"]=roundPct(float64(used)/float64(st.Blocks)*100) }
 	if b,err:=os.ReadFile("/proc/loadavg"); err==nil { fields:=strings.Fields(string(b)); if len(fields)>=3 { out["load_average"]=fields[:3] } }
+	if interfaces,err:=net.Interfaces(); err==nil { items:=[]response{}; for _,iface:=range interfaces { if iface.Flags&net.FlagUp==0 { continue }; addresses,_:=iface.Addrs(); values:=[]string{}; for _,addr:=range addresses { values=append(values,addr.String()) }; items=append(items,response{"name":iface.Name,"addresses":values,"mtu":iface.MTU}) }; out["network_interfaces"]=items }
 	return out
 }
 func hostname() string { h,_:=os.Hostname(); return h }
