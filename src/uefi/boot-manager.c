@@ -213,6 +213,8 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
         EFI_FILE_HANDLE Next = NULL;
         EFI_STATUS OpenStatus;
         const CHAR16 *Component = Loader->Components[i];
+        CHAR16 FileName[256];
+        UINTN k = 0;
         if (Component == NULL || Component[0] == 0) {
             if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
             return NULL;
@@ -224,8 +226,17 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
             else if (i == 2) { CHAR16 M[] = L"SELECTOS_COMPONENT_GRUB\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
         }
 #endif
+        while (Component[k] != 0 && k + 1 < sizeof(FileName) / sizeof(FileName[0])) {
+            FileName[k] = Component[k];
+            ++k;
+        }
+        if (Component[k] != 0) {
+            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+            return NULL;
+        }
+        FileName[k] = 0;
         OpenStatus = uefi_call_wrapper(Root->Open, 5, Root, &Next,
-                                       (CHAR16 *)Component, EFI_FILE_MODE_READ, 0);
+                                       FileName, (UINT64)EFI_FILE_MODE_READ, (UINT64)0);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (Loader == &KnownLoaders[2]) {
             if (EFI_ERROR(OpenStatus) || Next == NULL) {
