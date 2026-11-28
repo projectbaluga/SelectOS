@@ -24,7 +24,7 @@ cat > "$TMP/bin/mount" <<'MOCK'
 #!/bin/bash
 case "$*" in
   *"ro,nosuid,nodev,noexec"*) : ;;
-  *) echo "mount options were not read-only/noexec" >&2; exit 1 ;;
+  *) echo "mount options were not read-only/noexec: $*" >&2; exit 1 ;;
 esac
 for last; do :; done
 printf '%s\n' "$*" >> "$SELECTOS_TEST_MOUNT_LOG"
@@ -38,16 +38,13 @@ MOCK
 chmod +x "$TMP/bin/"*
 printf '1\n' > "$TMP/console/input"
 
-# Replace absolute BusyBox paths with host utilities for this fixture test.
+# Replace only the BusyBox utility paths; scanner and mount tools are injected
+# through explicit environment overrides, just as the runtime supports.
 mkdir -p "$TMP/bin/bin"
 for cmd in rm tr wc sed; do
   ln -s "$(command -v "$cmd")" "$TMP/bin/bin/$cmd"
 done
 sed \
-  -e "s|/sbin/blkid|$TMP/bin/blkid|g" \
-  -e "s|/bin/blkid|$TMP/bin/blkid|g" \
-  -e "s|/bin/mount|$TMP/bin/mount|g" \
-  -e "s|/bin/umount|$TMP/bin/umount|g" \
   -e "s|/bin/rm|$TMP/bin/bin/rm|g" \
   -e "s|/bin/tr|$TMP/bin/bin/tr|g" \
   -e "s|/bin/busybox wc|$TMP/bin/bin/wc|g" \
@@ -55,11 +52,23 @@ sed \
   -e "s|/bin/busybox sed|$TMP/bin/bin/sed|g" \
   "$MENU" > "$TMP/menu-test"
 chmod +x "$TMP/menu-test"
-output="$(SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" SELECTOS_TEST_MOUNT_LOG="$TMP/mount.log" bash "$TMP/menu-test")"
-grep -q 'Windows' <<< "$output"
-grep -q 'Napili:' <<< "$output"
-grep -q 'Hindi pa available ang UEFI handoff' <<< "$output"
-grep -q 'ro,nosuid,nodev,noexec' "$TMP/mount.log"
+if ! output="$(SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" SELECTOS_BLKID="$TMP/bin/blkid" SELECTOS_MOUNT="$TMP/bin/mount" SELECTOS_UMOUNT="$TMP/bin/umount" SELECTOS_TEST_MOUNT_LOG="$TMP/mount.log" bash "$TMP/menu-test" 2>"$TMP/stderr")"; then
+  cat "$TMP/stderr" >&2
+  echo "EFI menu returned a failure." >&2
+  exit 1
+fi
+for expected in Windows 'Napili:' 'Hindi pa available ang UEFI handoff'; do
+  if ! grep -q "$expected" <<< "$output"; then
+    echo "Missing expected menu output: $expected" >&2
+    printf '%s\n' "$output" >&2
+    exit 1
+  fi
+done
+if ! grep -q 'ro,nosuid,nodev,noexec' "$TMP/mount.log"; then
+  echo "ESP was not mounted with the required read-only/noexec options." >&2
+  cat "$TMP/mount.log" >&2 || true
+  exit 1
+fi
 
 # No firmware-write or command-execution mechanism is permitted in this phase.
 if grep -Eiq 'BootNext|efivarfs|(^|[[:space:]])(exec|chroot)[[:space:]]' "$MENU"; then
