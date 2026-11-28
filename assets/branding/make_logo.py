@@ -1,7 +1,6 @@
-"""SelectOS logo generator. Run: python3 make_logo.py  (needs: pip install cairosvg fonttools)"""
+"""Generate SelectOS branding SVG and PNG assets (requires cairosvg, fonttools, and licensed Poppins TTF files)."""
 import argparse
 import os
-import sys
 
 import cairosvg
 from fontTools.ttLib import TTFont
