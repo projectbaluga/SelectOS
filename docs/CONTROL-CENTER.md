@@ -19,7 +19,7 @@ The Control Center is an administrator-only web console for the Debian server on
 - No PC user login, boot gate, remote desktop, remote shell, file browsing, restart, or shutdown.
 - No remote command channel. This prevents a dashboard compromise from becoming a fleet-wide arbitrary command execution path.
 - No internet/cloud dependency. The dashboard and API are intended for the private LAN.
-- The current agent reports memory and disk utilization; its CPU metric is currently zero/not sampled. Per-PC live CPU graphs are not claimed.
+- The current agent reports memory and disk utilization; CPU, memory and disk metrics are reported by the Linux agent. Per-PC historical graphs are not implemented.
 - Audit events are application events, not a full journalctl/syslog viewer.
 - Dashboard administrator authentication is management-plane access; it does not authenticate a person at a SelectOS workstation.
 
