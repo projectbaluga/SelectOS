@@ -150,46 +150,31 @@ static UINTN LocalPrint(const CHAR16 *Format, ...) {
 typedef struct {
     const CHAR16 *Path;
     const CHAR16 *Label;
-    const CHAR16 *Components[4];
+    const char *Prefixes[4];
     UINTN ComponentCount;
 } KNOWN_LOADER;
 
-/* Use CHAR16 arrays initialized from narrow character constants for component
- * names. This avoids relying on compiler wchar_t layout for path traversal.
- */
-static const CHAR16 C_EFI[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x0000 };
-static const CHAR16 C_MICROSOFT[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x004d, 0x0069, 0x0063, 0x0072, 0x006f, 0x0073, 0x006f, 0x0066, 0x0074, 0x0000 };
-static const CHAR16 C_BOOT[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x004d, 0x0069, 0x0063, 0x0072, 0x006f, 0x0073, 0x006f, 0x0066, 0x0074, 0x005c, 0x0042, 0x006f, 0x006f, 0x0074, 0x0000 };
-static const CHAR16 C_BOOTMGFW[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x004d, 0x0069, 0x0063, 0x0072, 0x006f, 0x0073, 0x006f, 0x0066, 0x0074, 0x005c, 0x0042, 0x006f, 0x006f, 0x0074, 0x005c, 0x0062, 0x006f, 0x006f, 0x0074, 0x006d, 0x0067, 0x0066, 0x0077, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_UBUNTU[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0075, 0x0062, 0x0075, 0x006e, 0x0074, 0x0075, 0x0000 };
-static const CHAR16 C_DEBIAN[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0064, 0x0065, 0x0062, 0x0069, 0x0061, 0x006e, 0x0000 };
-static const CHAR16 C_FEDORA[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0066, 0x0065, 0x0064, 0x006f, 0x0072, 0x0061, 0x0000 };
-static const CHAR16 C_OPENSUSE[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x006f, 0x0070, 0x0065, 0x006e, 0x0073, 0x0075, 0x0073, 0x0065, 0x0000 };
-static const CHAR16 C_SHIMX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0075, 0x0062, 0x0075, 0x006e, 0x0074, 0x0075, 0x005c, 0x0073, 0x0068, 0x0069, 0x006d, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_GRUBX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0075, 0x0062, 0x0075, 0x006e, 0x0074, 0x0075, 0x005c, 0x0067, 0x0072, 0x0075, 0x0062, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_SHIM[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x006f, 0x0070, 0x0065, 0x006e, 0x0073, 0x0075, 0x0073, 0x0065, 0x005c, 0x0073, 0x0068, 0x0069, 0x006d, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_SYSTEMD[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0073, 0x0079, 0x0073, 0x0074, 0x0065, 0x006d, 0x0064, 0x0000 };
-static const CHAR16 C_SYSTEMDBOOT[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0073, 0x0079, 0x0073, 0x0074, 0x0065, 0x006d, 0x0064, 0x005c, 0x0073, 0x0079, 0x0073, 0x0074, 0x0065, 0x006d, 0x0064, 0x002d, 0x0062, 0x006f, 0x006f, 0x0074, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_REFIND[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0072, 0x0065, 0x0066, 0x0069, 0x006e, 0x0064, 0x0000 };
-static const CHAR16 C_REFINDX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0072, 0x0065, 0x0066, 0x0069, 0x006e, 0x0064, 0x005c, 0x0072, 0x0065, 0x0066, 0x0069, 0x006e, 0x0064, 0x005f, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-
-static const CHAR16 C_DEBIAN_SHIMX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0064, 0x0065, 0x0062, 0x0069, 0x0061, 0x006e, 0x005c, 0x0073, 0x0068, 0x0069, 0x006d, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_DEBIAN_GRUBX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0064, 0x0065, 0x0062, 0x0069, 0x0061, 0x006e, 0x005c, 0x0067, 0x0072, 0x0075, 0x0062, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_FEDORA_SHIMX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0066, 0x0065, 0x0064, 0x006f, 0x0072, 0x0061, 0x005c, 0x0073, 0x0068, 0x0069, 0x006d, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_FEDORA_GRUBX64[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x0066, 0x0065, 0x0064, 0x006f, 0x0072, 0x0061, 0x005c, 0x0067, 0x0072, 0x0075, 0x0062, 0x0078, 0x0036, 0x0034, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-static const CHAR16 C_OPENSUSE_SHIM[] = { 0x005c, 0x0045, 0x0046, 0x0049, 0x005c, 0x006f, 0x0070, 0x0065, 0x006e, 0x0073, 0x0075, 0x0073, 0x0065, 0x005c, 0x0073, 0x0068, 0x0069, 0x006d, 0x002e, 0x0065, 0x0066, 0x0069, 0x0000 };
-
 static const KNOWN_LOADER KnownLoaders[] = {
-    { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager", { C_EFI, C_MICROSOFT, C_BOOT, C_BOOTMGFW }, 4 },
-    { L"/EFI/ubuntu/shimx64.efi", L"Ubuntu (shim)", { C_EFI, C_UBUNTU, C_SHIMX64 }, 3 },
-    { L"/EFI/ubuntu/grubx64.efi", L"Ubuntu (GRUB)", { C_EFI, C_UBUNTU, C_GRUBX64 }, 3 },
-    { L"/EFI/debian/shimx64.efi", L"Debian (shim)", { C_EFI, C_DEBIAN, C_DEBIAN_SHIMX64 }, 3 },
-    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)", { C_EFI, C_DEBIAN, C_DEBIAN_GRUBX64 }, 3 },
-    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)", { C_EFI, C_FEDORA, C_FEDORA_SHIMX64 }, 3 },
-    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)", { C_EFI, C_FEDORA, C_FEDORA_GRUBX64 }, 3 },
-    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)", { C_EFI, C_OPENSUSE, C_OPENSUSE_SHIM }, 3 },
-    { L"/EFI/systemd/systemd-bootx64.efi", L"systemd-boot", { C_EFI, C_SYSTEMD, C_SYSTEMDBOOT }, 3 },
-    { L"/EFI/refind/refind_x64.efi", L"rEFInd", { C_EFI, C_REFIND, C_REFINDX64 }, 3 }
+    { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager",
+      { "\\EFI", "\\EFI\\Microsoft", "\\EFI\\Microsoft\\Boot", "\\EFI\\Microsoft\\Boot\\bootmgfw.efi" }, 4 },
+    { L"/EFI/ubuntu/shimx64.efi", L"Ubuntu (shim)",
+      { "\\EFI", "\\EFI\\ubuntu", "\\EFI\\ubuntu\\shimx64.efi" }, 3 },
+    { L"/EFI/ubuntu/grubx64.efi", L"Ubuntu (GRUB)",
+      { "\\EFI", "\\EFI\\ubuntu", "\\EFI\\ubuntu\\grubx64.efi" }, 3 },
+    { L"/EFI/debian/shimx64.efi", L"Debian (shim)",
+      { "\\EFI", "\\EFI\\debian", "\\EFI\\debian\\shimx64.efi" }, 3 },
+    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)",
+      { "\\EFI", "\\EFI\\debian", "\\EFI\\debian\\grubx64.efi" }, 3 },
+    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)",
+      { "\\EFI", "\\EFI\\fedora", "\\EFI\\fedora\\shimx64.efi" }, 3 },
+    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)",
+      { "\\EFI", "\\EFI\\fedora", "\\EFI\\fedora\\grubx64.efi" }, 3 },
+    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)",
+      { "\\EFI", "\\EFI\\opensuse", "\\EFI\\opensuse\\shim.efi" }, 3 },
+    { L"/EFI/systemd/systemd-bootx64.efi", L"systemd-boot",
+      { "\\EFI", "\\EFI\\systemd", "\\EFI\\systemd\\systemd-bootx64.efi" }, 3 },
+    { L"/EFI/refind/refind_x64.efi", L"rEFInd",
+      { "\\EFI", "\\EFI\\refind", "\\EFI\\refind\\refind_x64.efi" }, 3 }
 };
 
 static VOID PauseForKey(VOID) {
@@ -208,33 +193,29 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
-    /* Open explicit absolute path prefixes from the volume root. */
+    /* Convert ASCII path prefixes into writable UTF-16 buffers for firmware. */
     for (i = 0; i < Loader->ComponentCount; ++i) {
         EFI_FILE_HANDLE Next = NULL;
         EFI_STATUS OpenStatus;
-        const CHAR16 *Component = Loader->Components[i];
+        const char *Prefix = Loader->Prefixes[i];
         CHAR16 FileName[256];
         UINTN k = 0;
-        if (Component == NULL || Component[0] == 0) {
+        if (Prefix == NULL || Prefix[0] == 0) {
             if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
             return NULL;
         }
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (Loader == &KnownLoaders[2]) {
-            if (Component == C_EFI) { CHAR16 M[] = L"SELECTOS_COMPONENT_POINTER_MATCH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-            if (Component[0] == (CHAR16)0x005c) { CHAR16 M[] = L"SELECTOS_COMPONENT_FIRST_BACKSLASH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-            if (Component[1] == (CHAR16)0x0045) { CHAR16 M[] = L"SELECTOS_COMPONENT_SECOND_E\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
-            if (Component[4] == 0) { CHAR16 M[] = L"SELECTOS_COMPONENT_TERMINATED_AT_4\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             if (i == 0) { CHAR16 M[] = L"SELECTOS_COMPONENT_EFI\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             else if (i == 1) { CHAR16 M[] = L"SELECTOS_COMPONENT_UBUNTU\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             else if (i == 2) { CHAR16 M[] = L"SELECTOS_COMPONENT_GRUB\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
         }
 #endif
-        while (Component[k] != 0 && k + 1 < sizeof(FileName) / sizeof(FileName[0])) {
-            FileName[k] = Component[k];
+        while (Prefix[k] != 0 && k + 1 < sizeof(FileName) / sizeof(FileName[0])) {
+            FileName[k] = (CHAR16)(UINT8)Prefix[k];
             ++k;
         }
-        if (Component[k] != 0) {
+        if (Prefix[k] != 0) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
             if (Loader == &KnownLoaders[2]) { CHAR16 M[] = L"SELECTOS_COMPONENT_COPY_TOO_LONG\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
 #endif
