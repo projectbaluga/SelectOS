@@ -1,7 +1,7 @@
 {
   "_help": "Edit with Notepad. Save as plain text. New operating systems appear on their own; add a rule below only to rename, reorder, hide, or give an OS its own icon.",
 
-  "brand":  { "name": "SelectOS", "subtitle": "Multi-boot Selector" },
+  "brand":  { "name": "SelectOS", "subtitle": "Multi-boot Selector", "logo": "icons/selectos.png" },
   "domain": "",
 
   "default": "",

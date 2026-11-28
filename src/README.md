@@ -1,7 +1,6 @@
-# Source of the SelectOS init binary
+# Runtime sources
 
-The current `boot/select.img` contains a stripped, statically-linked Go binary that acts as `/init`.
-
-Source code is not yet available in this repository.
-
-Contributions that reverse-engineer or re-implement the OS detection / selection UI are welcome here.
+| Path | What it is |
+| ---- | ---------- |
+| `gate-runtime/` | Go source of the `/init` binary inside `boot/select.img` (graphical OS selector, `select.json`/`gate.json` config, SelectOS logo support). `gate-runtime/tools/build-image.sh` rebuilds `gate-test.img.gz`-style images from it. See `gate-runtime/README.md`. |
+| `native-initramfs/` | Experimental shell-based native PID 1 (diagnostic bring-up only). |

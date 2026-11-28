@@ -1,4 +1,10 @@
-# SelectOS
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/branding/svg/selectos-logo-dark-bg.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/branding/svg/selectos-logo-light-bg.svg">
+    <img alt="SelectOS" src="assets/branding/svg/selectos-logo-light-bg.svg" width="460">
+  </picture>
+</p>
 
 Lightweight UEFI multi-boot selector. The project is transitioning away from the bundled legacy Gate/Gbox runtime toward a native SelectOS runtime.
 

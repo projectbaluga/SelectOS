@@ -23,3 +23,7 @@ The current prebuilt Gate/Gbox runtime may still display its legacy login. Remov
 ## Server management
 
 See [CONTROL-CENTER.md](CONTROL-CENTER.md) for the Debian LAN dashboard, device agent, API, TLS reverse proxy, backups, and restore operations.
+
+## Branding
+
+Logo files, colours and usage rules: [BRANDING.md](BRANDING.md).

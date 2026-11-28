@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 32 448 448" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b9bff"/><stop offset="1" stop-color="#2f5fe0"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0.25" cy="0.15" r="0.8">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#bg)"/>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#shine)"/>
+  <rect x="96"  y="192" width="80"  height="128" rx="24" fill="#fff" fill-opacity="0.38"/>
+  <rect x="336" y="192" width="80"  height="128" rx="24" fill="#fff" fill-opacity="0.38"/>
+  <rect x="200" y="176" width="112" height="176" rx="30" fill="#0b1c5c" fill-opacity="0.22"/>
+  <rect x="200" y="166" width="112" height="176" rx="30" fill="#fff"/>
+<g transform="translate(221 197) scale(2.45)"><path d="M0 0 L0 40 L10.5 30 L18 47 L26 43.5 L18.5 27.5 L32 27.5 Z" fill="#2f5fe0" stroke="#2f5fe0" stroke-width="2.4" stroke-linejoin="round"/></g></svg>
