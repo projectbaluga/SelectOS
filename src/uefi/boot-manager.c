@@ -8,6 +8,50 @@ static EFI_GUID SimpleFsGuid = EFI_SIMPLE_FS_GUID;
 typedef struct { EFI_HANDLE Device; const CHAR16 *Path; const CHAR16 *Label; } BOOT_ENTRY;
 static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+static UINTN TestFsHandleCount;
+static EFI_STATUS TestLocateStatus;
+static VOID WriteTestDiagnostics(EFI_HANDLE ImageHandle) {
+    EFI_LOADED_IMAGE *Loaded = NULL;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
+    EFI_FILE_HANDLE Root = NULL, File = NULL;
+    EFI_STATUS Status;
+    CHAR8 Buffer[128];
+    UINTN Length = 0, i;
+    const CHAR8 Prefix[] = "SELECTOS_MANAGER_STARTED\\n";
+    const CHAR8 Scan[] = "SCAN_HANDLES=";
+    const CHAR8 EntriesText[] = "\\nENTRIES=";
+    Status = uefi_call_wrapper(BS->HandleProtocol, 3, ImageHandle, &LoadedImageProtocol, (VOID **)&Loaded);
+    if (EFI_ERROR(Status) || Loaded == NULL) return;
+    Status = uefi_call_wrapper(BS->HandleProtocol, 3, Loaded->DeviceHandle, &SimpleFsGuid, (VOID **)&Fs);
+    if (EFI_ERROR(Status) || Fs == NULL) return;
+    Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
+    if (EFI_ERROR(Status) || Root == NULL) return;
+    for (i = 0; i + 1 < sizeof(Prefix); ++i) Buffer[Length++] = Prefix[i];
+    for (i = 0; i + 1 < sizeof(Scan); ++i) Buffer[Length++] = Scan[i];
+    {
+        CHAR8 Digits[24]; UINTN Count = 0, Value = TestFsHandleCount, j;
+        do { Digits[Count++] = (CHAR8)('0' + (Value % 10)); Value /= 10; } while (Value && Count < sizeof(Digits));
+        for (j = Count; j > 0; --j) Buffer[Length++] = Digits[j - 1];
+    }
+    for (i = 0; i + 1 < sizeof(EntriesText); ++i) Buffer[Length++] = EntriesText[i];
+    {
+        CHAR8 Digits[24]; UINTN Count = 0, Value = EntryCount, j;
+        do { Digits[Count++] = (CHAR8)('0' + (Value % 10)); Value /= 10; } while (Value && Count < sizeof(Digits));
+        for (j = Count; j > 0; --j) Buffer[Length++] = Digits[j - 1];
+    }
+    Buffer[Length++] = '\\n';
+    Status = uefi_call_wrapper(Root->Open, 5, Root, &File, L"\\selectos-debug.log",
+                               EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
+    if (!EFI_ERROR(Status) && File != NULL) {
+        uefi_call_wrapper(File->SetPosition, 2, File, 0);
+        uefi_call_wrapper(File->Write, 3, File, &Length, Buffer);
+        uefi_call_wrapper(File->Flush, 1, File);
+        uefi_call_wrapper(File->Close, 1, File);
+    }
+    uefi_call_wrapper(Root->Close, 1, Root);
+}
+#endif
 static UINTN ConsoleWriteString(const CHAR16 *Text) {
     UINTN Count = 0;
     if (Text == NULL || ST == NULL || ST->ConOut == NULL) return 0;
@@ -123,7 +167,15 @@ static VOID ScanFilesystems(VOID) {
     UINTN HandleCount = 0, i, j;
     EFI_STATUS Status;
     EntryCount = 0;
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    TestFsHandleCount = 0;
+    TestLocateStatus = EFI_SUCCESS;
+#endif
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    TestLocateStatus = Status;
+    TestFsHandleCount = HandleCount;
+#endif
     if (EFI_ERROR(Status) || Handles == NULL) return;
     for (i = 0; i < HandleCount && EntryCount < MAX_BOOT_ENTRIES; ++i) {
         EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
@@ -260,6 +312,9 @@ static EFI_STATUS LaunchEntry(EFI_HANDLE ImageHandle, const BOOT_ENTRY *Entry) {
 }
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     InitializeLib(ImageHandle, SystemTable);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    WriteTestDiagnostics(ImageHandle);
+#endif
     for (;;) {
         UINTN i, Selection;
         EFI_STATUS Status;
@@ -268,6 +323,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         LocalPrint(L"===========================================\r\n\r\n");
         LocalPrint(L"Scanning UEFI-readable filesystem volumes...\r\n");
         ScanFilesystems();
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        WriteTestDiagnostics(ImageHandle);
+#endif
         if (EntryCount == 0) {
             LocalPrint(L"\r\nNo supported EFI loader was found.\r\n");
             LocalPrint(L"No firmware boot variable or disk content was changed.\r\n");
