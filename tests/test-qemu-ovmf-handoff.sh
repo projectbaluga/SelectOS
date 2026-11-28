@@ -63,15 +63,15 @@ mmd -i "$FAT_IMAGE" ::/EFI/ubuntu
 mcopy -i "$FAT_IMAGE" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
 mcopy -i "$FAT_IMAGE" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
 
-python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" <<'PY'
+python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" "$WORK/serial.log" <<'PY'
 import json, os, socket, subprocess, sys, tempfile, time
-image, firmware, variables = sys.argv[1:4]
+image, firmware, variables, serial_log = sys.argv[1:5]
 qmp_path = os.path.join(tempfile.gettempdir(), f"selectos-qmp-{os.getpid()}.sock")
 cmd = [
     "qemu-system-x86_64", "-machine", "pc,accel=tcg", "-m", "512",
     "-drive", f"if=pflash,format=raw,readonly=on,file={firmware}",
     "-drive", f"if=pflash,format=raw,file={variables}",
-    "-display", "none", "-serial", "none",
+    "-display", "none", "-serial", f"file:{serial_log}",
     "-monitor", "none", "-qmp", f"unix:{qmp_path},server=on,wait=off",
     "-device", "qemu-xhci,id=xhci",
     "-drive", f"if=none,id=stick,format=raw,file={image}",
@@ -110,7 +110,7 @@ try:
                 raise RuntimeError(f"QMP {command} failed: {response['error']}")
     qmp("qmp_capabilities")
     # Allow OVMF to enumerate the removable FAT volume and launch SelectOS.
-    time.sleep(5)
+    time.sleep(10)
     try:
         qmp("human-monitor-command", {"command-line": "sendkey 1"})
         time.sleep(0.3)
@@ -135,6 +135,11 @@ finally:
     _, stderr = proc.communicate()
     if stderr:
         print("QEMU stderr: " + stderr.decode(errors="replace"), file=sys.stderr)
+    if os.path.exists(serial_log):
+        with open(serial_log, "r", errors="replace") as serial:
+            output = serial.read()
+        if output:
+            print("QEMU serial output:\\n" + output, file=sys.stderr)
     try:
         os.unlink(qmp_path)
     except FileNotFoundError:
