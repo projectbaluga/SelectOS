@@ -107,7 +107,7 @@ UEFI_CHAINLOADING=not-implemented
 PRODUCTION_READY=false
 WARNING=Experimental diagnostic image only; it does not yet select or boot installed operating systems.
 INFO
-sha256sum "$OUT" "${DIST}/IMAGE-BUILD-INFO.txt" > "${DIST}/IMAGE-SHA256SUMS"
+(cd "$DIST" && sha256sum "$(basename "$OUT")" IMAGE-BUILD-INFO.txt > IMAGE-SHA256SUMS)
 file "$OUT"
 echo "Experimental native image created: $OUT"
 echo "WARNING: diagnostic console only; not a production multi-boot image."
