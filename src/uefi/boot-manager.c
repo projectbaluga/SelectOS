@@ -178,10 +178,10 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
     /* Walk one component at a time. This avoids firmware-specific differences
      * in how root handles parse multi-component absolute/relative paths.
      */
-    while (Path[i] == L'\\' || Path[i] == L'/') ++i;
+    while (Path[i] == L'\\' || Path[i] == (CHAR16)0x002f) ++i;
     for (;;) {
         j = 0;
-        while (Path[i] != 0 && Path[i] != L'\\' && Path[i] != L'/') {
+        while (Path[i] != 0 && Path[i] != L'\\' && Path[i] != (CHAR16)0x002f) {
             if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
                 if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
                 return NULL;
@@ -220,7 +220,7 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
         if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
         Current = Next;
         OwnsCurrent = TRUE;
-        while (Path[i] == L'\\' || Path[i] == L'/') ++i;
+        while (Path[i] == L'\\' || Path[i] == (CHAR16)0x002f) ++i;
         if (Path[i] == 0) return Current;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_FINAL_OPENED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
