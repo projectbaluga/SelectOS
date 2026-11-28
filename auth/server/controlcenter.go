@@ -136,7 +136,7 @@ func hostMetrics() response {
 	if b,err:=os.ReadFile("/proc/uptime"); err==nil { f:=strings.Fields(string(b)); if len(f)>0 { seconds,_:=strconv.ParseFloat(f[0],64); out["uptime_seconds"]=int64(seconds) } }
 	var st syscall.Statfs_t
 	if err:=syscall.Statfs("/",&st); err==nil && st.Blocks>0 { used:=st.Blocks-st.Bfree; out["disk_total_gb"]=uint64(st.Blocks)*uint64(st.Bsize)/1024/1024/1024; out["disk_used_percent"]=roundPct(float64(used)/float64(st.Blocks)*100) }
-	if b,err:=os.ReadFile("/proc/loadavg"); err==nil { out["load_average"]=strings.Fields(string(b))[:3] }
+	if b,err:=os.ReadFile("/proc/loadavg"); err==nil { fields:=strings.Fields(string(b)); if len(fields)>=3 { out["load_average"]=fields[:3] } }
 	return out
 }
 func hostname() string { h,_:=os.Hostname(); return h }
