@@ -16,7 +16,7 @@ SSE4.1/SSE4.2 or AVX dependencies). The boot manager constructs its file device
 path locally rather than relying on a distro-built GNU-EFI helper that may use
 newer SIMD instructions.
 
-The test uses a temporary GPT/FAT32 EFI System Partition image and does not
+The test uses a temporary whole-device FAT32 removable-media image and does not
 modify host EFI variables or NVRAM. The production native image remains marked `PRODUCTION_READY=false`.
 
 
