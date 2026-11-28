@@ -63,6 +63,10 @@ func loadConfig(base string) *Config {
 			fmt.Println("gate: gate.json is invalid, using defaults:", err)
 			return c
 		}
+		if strings.TrimSpace(n.Domain) == "" {
+			n.Domain = c.Domain
+		}
+		n.Domain = strings.TrimPrefix(strings.TrimSpace(n.Domain), "@")
 		fmt.Println("gate: loaded", p)
 		return &n
 	}
