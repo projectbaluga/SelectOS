@@ -25,7 +25,7 @@ On Debian/Ubuntu:
 ```sh
 sudo apt-get update
 sudo apt-get install -y busybox-static cpio gzip coreutils file parted dosfstools util-linux
-bash scripts/build-native-initramfs.sh
+sudo bash scripts/build-native-initramfs.sh
 sudo SELECTOS_BUILD_NATIVE_EXPERIMENTAL=1 bash scripts/build-native-image.sh
 ```
 
