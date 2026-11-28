@@ -9,6 +9,11 @@ if grep -Eiq 'SetVariable|GetVariable|ExitBootServices|efivarfs|BootNext' "$SRC"
 fi
 grep -q 'LocateHandleBuffer' "$SRC"
 grep -q 'EFI_FILE_MODE_READ' "$SRC"
+grep -q 'BuildFileDevicePath' "$SRC"
+if grep -q 'FileDevicePath(' "$SRC"; then
+  echo "UEFI loader must not depend on the distro GNU-EFI FileDevicePath helper." >&2
+  exit 1
+fi
 grep -q 'LoadImage' "$SRC"
 grep -q 'StartImage' "$SRC"
 grep -q 'EFI_SECURITY_VIOLATION' "$SRC"
