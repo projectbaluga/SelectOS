@@ -11,6 +11,7 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="${ROOT}/dist/native"
 OUT="${SELECTOS_NATIVE_IMAGE_OUT:-${DIST}/SelectOS-native-experimental.img}"
+TMP_OUT="${OUT}.tmp.$"
 SIZE_MB="${SELECTOS_NATIVE_IMAGE_SIZE_MB:-512}"
 LABEL="SELECTOS"
 MNT=""
@@ -31,7 +32,7 @@ for f in "${required[@]}"; do
   [[ -s "$f" ]] || { echo "ERROR: Required input missing or empty: $f" >&2; exit 1; }
 done
 
-for cmd in dd parted losetup mkfs.vfat mount umount sync file; do
+for cmd in dd parted losetup mkfs.vfat mount umount sync file install sleep mv; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: Missing build dependency: $cmd" >&2; exit 1; }
 done
 [[ "$SIZE_MB" =~ ^[0-9]+$ ]] && (( SIZE_MB >= 128 )) || {
@@ -49,18 +50,16 @@ cleanup() {
     rmdir "$MNT" 2>/dev/null || true
   fi
   if [[ -n "$LOOP" ]]; then losetup -d "$LOOP" 2>/dev/null || true; fi
-  if [[ -n "$WORK" && -d "$WORK" ]]; then rm -rf -- "$WORK"; fi
+  if [[ -n "$TMP_OUT" && -f "$TMP_OUT" ]]; then rm -f -- "$TMP_OUT"; fi
 }
-WORK="$(mktemp -d)"
 trap cleanup EXIT
 
 echo "==> Building separate experimental native SelectOS image"
-dd if=/dev/zero of="$OUT" bs=1M count="$SIZE_MB" status=none
-parted -s "$OUT" mklabel msdos
-parted -s "$OUT" mkpart primary fat32 1MiB 100%
-parted -s "$OUT" set 1 boot on
-parted -s "$OUT" set 1 esp on
-LOOP="$(losetup -fP --show "$OUT")"
+dd if=/dev/zero of="$TMP_OUT" bs=1M count="$SIZE_MB" status=none
+parted -s "$TMP_OUT" mklabel gpt
+parted -s "$TMP_OUT" mkpart ESP fat32 1MiB 100%
+parted -s "$TMP_OUT" set 1 esp on
+LOOP="$(losetup -fP --show "$TMP_OUT")"
 PART="${LOOP}p1"
 for attempt in {1..10}; do
   [[ -b "$PART" ]] && break
@@ -95,6 +94,7 @@ INFO
 sync
 cleanup
 trap - EXIT
+mv -- "$TMP_OUT" "$OUT"
 
 [[ -s "$OUT" ]] || { echo "ERROR: Native image was not created." >&2; exit 1; }
 file "$OUT"
