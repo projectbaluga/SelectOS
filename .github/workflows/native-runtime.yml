@@ -9,6 +9,7 @@ on:
       - "docs/NATIVE-RUNTIME-STATUS.md"
       - "docs/CONTROL-CENTER-CONNECT.md"
       - "auth/agent/**"
+      - "docs/CONTROL-CENTER-CONNECT.md"
       - ".github/workflows/native-runtime.yml"
   push:
     branches: [main]
@@ -27,6 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+      - name: Compile Control Center device agent
+        run: cd auth/agent && go test ./... && go build -trimpath -o /tmp/selectos-agent .
       - name: Install build dependencies
         run: |
           sudo apt-get update
