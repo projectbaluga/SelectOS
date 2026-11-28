@@ -181,6 +181,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
             ConsoleWriteHex(Path[3]); ConsoleWriteString(L",");
             ConsoleWriteHex(Path[4]); ConsoleWriteString(L"\r\n");
         }
+    if (Path == KnownLoaders[2].Path && Path[0] == (CHAR16)0x002f) { CHAR16 M[] = L"SELECTOS_PATH0_SLASH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+    if (Path == KnownLoaders[2].Path && Path[1] == (CHAR16)0x0045) { CHAR16 M[] = L"SELECTOS_PATH1_E\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+    if (Path == KnownLoaders[2].Path && Path[4] == (CHAR16)0x002f) { CHAR16 M[] = L"SELECTOS_PATH4_SLASH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
 #endif
 
     /* Walk one component at a time. This avoids firmware-specific differences
