@@ -17,3 +17,11 @@ EFI/BOOT/mmx64.efi
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Local server secrets, database backups, and generated executables
+auth/server/.env
+auth/server/backups/
+auth/server/*.sql
+auth/server/*.sql.gz
+auth/agent/selectos-agent
+auth/agent/credentials.json
