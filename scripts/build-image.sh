@@ -60,8 +60,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-rm -rf "$DIST"
 mkdir -p "$DIST"
+[[ ! -e "$IMG" ]] || { echo "ERROR: Refusing to overwrite existing image: $IMG" >&2; exit 1; }
 cat > "$DIST/SELECTOS-BUILD-INFO.txt" <<'EOF'
 PRODUCT=SelectOS
 RUNTIME=legacy-gate-gbox
