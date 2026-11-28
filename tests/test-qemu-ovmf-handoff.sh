@@ -63,10 +63,9 @@ echo "Disassembly near observed OVMF exception offset 0x7e7d:"
 objdump -d -Mintel "$WORK/BOOTX64.EFI" | grep -i -B 8 -A 8 "7e7d" || true
 
 truncate -s 64M "$WORK/uefi-test.img"
-parted -s "$WORK/uefi-test.img" mklabel gpt
-parted -s "$WORK/uefi-test.img" mkpart ESP fat32 1MiB 100%
-parted -s "$WORK/uefi-test.img" set 1 esp on
-FAT_IMAGE="$WORK/uefi-test.img@@1048576"
+# A whole-device FAT32 removable-media volume exercises the UEFI fallback
+# path without depending on GPT/ESP partition auto-discovery.
+FAT_IMAGE="$WORK/uefi-test.img"
 mformat -i "$FAT_IMAGE" -F ::
 mmd -i "$FAT_IMAGE" ::/EFI
 mmd -i "$FAT_IMAGE" ::/EFI/BOOT
@@ -85,11 +84,11 @@ cmd = [
     "-drive", f"if=pflash,format=raw,file={variables}",
     "-display", "none", "-serial", f"file:{serial_log}",
     "-monitor", "none", "-qmp", f"unix:{qmp_path},server=on,wait=off",
-    # Use the emulated PIIX IDE controller: it is available in the
-    # baseline OVMF build and avoids relying on the optional USB/XHCI DXE
-    # drivers being present in a distro firmware package.
-    "-drive", f"if=none,id=systemdisk,format=raw,file={image}",
-    "-device", "ide-hd,drive=systemdisk,bus=ide.0,bootindex=1",
+    # Whole-device FAT32 USB media exercises the standard UEFI
+    # removable-media fallback path (\\EFI\\BOOT\\BOOTX64.EFI).
+    "-device", "qemu-xhci,id=xhci",
+    "-drive", f"if=none,id=stick,format=raw,file={image}",
+    "-device", "usb-storage,drive=stick,bus=xhci.0,bootindex=1",
     "-boot", "order=c",
     "-no-reboot", "-no-shutdown",
 ]
