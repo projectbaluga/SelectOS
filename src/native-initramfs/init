@@ -1,0 +1,48 @@
+#!/bin/busybox sh
+# Experimental native SelectOS PID 1. Diagnostic bring-up only; no OS chainloader.
+export PATH=/bin:/sbin HOME=/ TERM=linux
+bb() { /bin/busybox "$@"; }
+log() { printf '[SelectOS] %s\n' "$*"; }
+
+bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+bb mkdir -p /proc /sys /run /dev/pts /tmp /mnt
+bb mount -t proc proc /proc 2>/dev/null || true
+bb mount -t sysfs sysfs /sys 2>/dev/null || true
+bb mount -t devpts devpts /dev/pts 2>/dev/null || true
+bb mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run 2>/dev/null || true
+bb mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp 2>/dev/null || true
+bb mdev -s 2>/dev/null || true
+
+clear 2>/dev/null || true
+cat <<'BANNER'
+  ____       _           _    ___  ____
+ / ___|  ___| | ___  ___| |_ / _ \\ / ___|
+ \\___ \\ / _ \\ |/ _ \\/ __| __| | | \\___ \\
+  ___) |  __/ |  __/ (__| |_| |_| |___) |
+ |____/ \\___|_|\\___|\\___|\\__|\\___/|____/
+       Native runtime — experimental
+BANNER
+log "Native PID 1 started."
+log "No username/password login is configured."
+log "No LAN, internet, PostgreSQL, or auth server is required."
+log "Detected block devices:"
+found=0
+for node in /sys/class/block/*; do
+  [ -e "$node" ] || continue
+  name="$(bb basename "$node")"
+  case "$name" in loop*|ram*) continue ;; esac
+  size="$(bb cat "$node/size" 2>/dev/null)"
+  printf '  - %s (%s sectors)\n' "$name" "${size:-unknown}"
+  found=1
+done
+[ "$found" -eq 1 ] || log "No block devices detected yet."
+cat <<'NOTICE'
+
+This build is a runtime bring-up milestone only.
+OS detection, selector UI, and UEFI chainloading are not implemented yet.
+The existing production/legacy boot image has not been modified.
+Press Enter to keep this diagnostic console open.
+NOTICE
+while :; do
+  IFS= read -r _answer </dev/console 2>/dev/null || bb sleep 3600
+done

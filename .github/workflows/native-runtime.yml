@@ -1,0 +1,68 @@
+name: Native SelectOS runtime foundation
+
+on:
+  pull_request:
+    paths:
+      - "src/native-initramfs/**"
+      - "scripts/build-native-initramfs.sh"
+      - "scripts/discover-efi-entries.py"
+      - "scripts/select-boot-entry.py"
+      - "tests/test-native-init.sh"
+      - "tests/test-boot-selector.py"
+      - "tests/test-efi-discovery.py"
+      - "docs/NATIVE-RUNTIME-STATUS.md"
+      - "docs/CONTROL-CENTER-CONNECT.md"
+      - "auth/agent/**"
+      - ".github/workflows/native-runtime.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/native-initramfs/**"
+      - "scripts/build-native-initramfs.sh"
+      - "scripts/discover-efi-entries.py"
+      - "scripts/select-boot-entry.py"
+      - "tests/test-native-init.sh"
+      - "tests/test-efi-discovery.py"
+      - "tests/test-boot-selector.py"
+      - "docs/NATIVE-RUNTIME-STATUS.md"
+      - "docs/CONTROL-CENTER-CONNECT.md"
+      - "auth/agent/**"
+      - ".github/workflows/native-runtime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-native-initramfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+      - name: Compile Control Center device agent
+        run: cd auth/agent && go test ./... && go build -trimpath -o /tmp/selectos-agent .
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y busybox-static cpio gzip coreutils file
+      - name: Check shell syntax and boot-path isolation
+        run: bash tests/test-native-init.sh
+      - name: Test read-only EFI discovery prototype
+        run: python3 tests/test-efi-discovery.py
+      - name: Test keyboard selector safety prototype
+        run: python3 tests/test-boot-selector.py
+      - name: Build experimental initramfs
+        run: bash scripts/build-native-initramfs.sh
+      - name: Verify artifact and checksums
+        run: |
+          test -s dist/native/select-native.img
+          grep -q '^PRODUCTION_READY=false$' dist/native/BUILD-INFO.txt
+          (cd dist/native && sha256sum -c SHA256SUMS)
+      - name: Upload experimental artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-native-runtime-bringup-experimental
+          path: dist/native/
+          if-no-files-found: error
+          retention-days: 14
