@@ -169,31 +169,55 @@ static VOID PauseForKey(VOID) {
     while (uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key) == EFI_NOT_READY)
         uefi_call_wrapper(BS->Stall, 1, 100000);
 }
-static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
-    EFI_FILE_HANDLE File = NULL;
-    EFI_STATUS Status = uefi_call_wrapper(Root->Open, 5, Root, &File, (CHAR16 *)Path, EFI_FILE_MODE_READ, 0);
-    /* Some firmware filesystem drivers accept only volume-relative paths
-     * when opening from the root handle. Retry without the leading slash.
+static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
+    EFI_FILE_HANDLE Current = Root, Next = NULL;
+    CHAR16 Component[256];
+    UINTN i = 0, j = 0;
+    BOOLEAN OwnsCurrent = FALSE;
+    if (Root == NULL || Path == NULL) return NULL;
+
+    /* Walk one component at a time. This avoids firmware-specific differences
+     * in how root handles parse multi-component absolute/relative paths.
      */
-    if (EFI_ERROR(Status) && Path != NULL && Path[0] == L'\\') {
-        Status = uefi_call_wrapper(Root->Open, 5, Root, &File,
-                                   (CHAR16 *)(Path + 1), EFI_FILE_MODE_READ, 0);
+    while (Path[i] == L'\\\\' || Path[i] == L'/') ++i;
+    for (;;) {
+        j = 0;
+        while (Path[i] != 0 && Path[i] != L'\\\\' && Path[i] != L'/') {
+            if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
+                if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+                return NULL;
+            }
+            Component[j++] = Path[i++];
+        }
+        if (j == 0) {
+            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+            return NULL;
+        }
+        Component[j] = 0;
+        Next = NULL;
+        if (EFI_ERROR(uefi_call_wrapper(Current->Open, 5, Current, &Next, Component,
+                                        EFI_FILE_MODE_READ, 0)) || Next == NULL) {
+            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+            return NULL;
+        }
+        if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+        Current = Next;
+        OwnsCurrent = TRUE;
+        while (Path[i] == L'\\\\' || Path[i] == L'/') ++i;
+        if (Path[i] == 0) return Current;
     }
+}
+static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
+    EFI_FILE_HANDLE File = OpenPathFromRoot(Root, Path);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (Path == KnownLoaders[2].Path) {
-        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\r\n";
-        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n";
-        CHAR16 Invalid[] = L"SELECTOS_TEST_CHILD_PATH_INVALID_PARAMETER\r\n";
-        CHAR16 Denied[] = L"SELECTOS_TEST_CHILD_PATH_ACCESS_DENIED\r\n";
-        CHAR16 Failed[] = L"SELECTOS_TEST_CHILD_PATH_OPEN_FAILED\r\n";
-        if (!EFI_ERROR(Status)) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
-        else if (Status == EFI_NOT_FOUND) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Missing);
-        else if (Status == EFI_INVALID_PARAMETER) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Invalid);
-        else if (Status == EFI_ACCESS_DENIED) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Denied);
-        else uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Failed);
+        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\\r\\n";
+        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\\r\\n";
+        if (File != NULL) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+        else uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Missing);
     }
 #endif
-    if (EFI_ERROR(Status)) return FALSE;
+    if (File == NULL) return FALSE;
     uefi_call_wrapper(File->Close, 1, File);
     return TRUE;
 }
