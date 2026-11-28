@@ -1,6 +1,14 @@
 name: Build legacy-compatible SelectOS image
 
 on:
+  pull_request:
+    paths:
+      - "scripts/build-image.sh"
+      - ".github/workflows/build-image.yml"
+      - "config/**"
+      - "boot/**"
+      - "EFI/**"
+      - "gate-test.img.gz"
   workflow_dispatch:
 
 permissions:
