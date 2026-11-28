@@ -11,5 +11,10 @@ the application's `LoadImage`/`StartImage` path can start an EFI child that
 returns control. It does not validate real operating-system boot, Secure Boot,
 physical hardware, all firmware implementations, or production readiness.
 
-The test uses a temporary FAT image and does not modify host EFI variables or
-NVRAM. The production native image remains marked `PRODUCTION_READY=false`.
+The test compiles both EFI applications for the baseline x86-64 ISA (without
+SSE4.1/SSE4.2 or AVX dependencies). The boot manager constructs its file device
+path locally rather than relying on a distro-built GNU-EFI helper that may use
+newer SIMD instructions.
+
+The test uses a temporary GPT/FAT32 EFI System Partition image and does not
+modify host EFI variables or NVRAM. The production native image remains marked `PRODUCTION_READY=false`.
