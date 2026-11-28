@@ -107,9 +107,13 @@ try:
     qmp("qmp_capabilities")
     # Allow OVMF to enumerate the removable FAT volume and launch SelectOS.
     time.sleep(5)
-    qmp("human-monitor-command", {"command-line": "sendkey 1"})
-    time.sleep(0.3)
-    qmp("human-monitor-command", {"command-line": "sendkey ret"})
+    try:
+        qmp("human-monitor-command", {"command-line": "sendkey 1"})
+        time.sleep(0.3)
+        qmp("human-monitor-command", {"command-line": "sendkey ret"})
+    except (BrokenPipeError, ConnectionResetError):
+        # The FAT marker is the authoritative assertion that the selected child ran.
+        pass
     # The child app writes a marker to the same FAT volume before returning.
     time.sleep(4)
 finally:
@@ -124,6 +128,9 @@ finally:
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
+    _, stderr = proc.communicate()
+    if stderr:
+        print("QEMU stderr: " + stderr.decode(errors="replace"), file=sys.stderr)
     try:
         os.unlink(qmp_path)
     except FileNotFoundError:
