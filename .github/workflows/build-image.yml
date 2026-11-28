@@ -1,6 +1,14 @@
-name: Build SelectOS image
+name: Build legacy-compatible SelectOS image
 
 on:
+  pull_request:
+    paths:
+      - "scripts/build-image.sh"
+      - ".github/workflows/build-image.yml"
+      - "config/**"
+      - "boot/**"
+      - "EFI/**"
+      - "gate-test.img.gz"
   workflow_dispatch:
 
 permissions:
@@ -8,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    name: Build bootable image
+    name: Build legacy Gate runtime image (login remains)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,15 +27,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y parted dosfstools util-linux gzip
 
-      - name: Extract boot files from repository image
+      - name: Extract legacy boot files
         shell: bash
         run: |
           set -Eeuo pipefail
-
           SOURCE="gate-test.img.gz"
           [[ -s "$SOURCE" ]] || { echo "::error::Missing repository source image: $SOURCE"; exit 1; }
           gzip -t "$SOURCE"
-
           WORK="$(mktemp -d)"
           LOOP=""
           cleanup() {
@@ -38,50 +44,51 @@ jobs:
             rm -rf "$WORK"
           }
           trap cleanup EXIT
-
           mkdir -p "$WORK/source"
           gzip -dc "$SOURCE" > "$WORK/source.img"
           LOOP="$(sudo losetup --find --show --partscan "$WORK/source.img")"
-
           PART="${LOOP}p1"
           for attempt in {1..10}; do
             [[ -b "$PART" ]] && break
             sleep 1
           done
           [[ -b "$PART" ]] || { echo "::error::Could not find source image partition $PART"; exit 1; }
-
           sudo mount -o ro "$PART" "$WORK/source"
-
           mkdir -p boot EFI/BOOT
-          sudo test -s "$WORK/source/BOOT/VMLINUZ"
-          sudo test -s "$WORK/source/BOOT/GATE.IMG"
-          sudo test -s "$WORK/source/EFI/BOOT/BOOTX64.EFI"
-          sudo test -s "$WORK/source/EFI/BOOT/GRUBX64.EFI"
-          sudo test -s "$WORK/source/EFI/BOOT/MMX64.EFI"
-
+          for file in BOOT/VMLINUZ BOOT/GATE.IMG EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do
+            sudo test -s "$WORK/source/$file"
+          done
           sudo cp "$WORK/source/BOOT/VMLINUZ" boot/vmlinuz
           sudo cp "$WORK/source/BOOT/GATE.IMG" boot/select.img
           sudo cp "$WORK/source/EFI/BOOT/BOOTX64.EFI" EFI/BOOT/BOOTX64.EFI
           sudo cp "$WORK/source/EFI/BOOT/GRUBX64.EFI" EFI/BOOT/grubx64.efi
           sudo cp "$WORK/source/EFI/BOOT/MMX64.EFI" EFI/BOOT/mmx64.efi
           sudo chown -R "$USER:$USER" boot EFI
-
           for file in boot/vmlinuz boot/select.img EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
             [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
-      - name: Build SelectOS image
-        run: sudo bash scripts/build-image.sh
+      - name: Validate image builder syntax
+        run: bash -n scripts/build-image.sh
 
-      - name: Verify image output
+      - name: Build explicitly marked legacy image
+        env:
+          SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
+        run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
+
+      - name: Verify image and legacy warning manifest
         run: |
           test -s dist/SelectOS.img
+          grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
+          grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
           file dist/SelectOS.img
 
-      - name: Upload image artifact
+      - name: Upload legacy image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SelectOS-image
-          path: dist/SelectOS.img
+          name: SelectOS-legacy-Gate-runtime
+          path: |
+            dist/SelectOS.img
+            dist/SELECTOS-BUILD-INFO.txt
           if-no-files-found: error
           retention-days: 14

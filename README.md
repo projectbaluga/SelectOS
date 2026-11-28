@@ -1,85 +1,74 @@
 # SelectOS
 
-Lightweight UEFI multi-boot selector, rebranded from the supplied legacy Gate image.
+Lightweight UEFI multi-boot selector. The project is transitioning away from the bundled legacy Gate/Gbox runtime toward a native SelectOS runtime.
 
-SelectOS boots a minimal Linux environment, detects installed operating systems, and presents a configurable menu for choosing an OS.
+**Authentication decision:** central authentication is deferred for a future release. The SelectOS boot path must not depend on the Debian authentication server, PostgreSQL, LAN, or internet access. The intended initial experience is a direct boot into the SelectOS operating-system selector without a login prompt.
 
-> **Build status:** the original compressed disk image, `gate-test.img.gz`, is stored in this repository. GitHub Actions extracts the required boot files from it automatically before building the SelectOS image. The legacy initramfs remains a prebuilt binary; its original source/build recipe is not present in this repository.
+> **Important current limitation:** the boot image still uses the prebuilt legacy Gate initramfs extracted from `gate-test.img.gz`. That binary contains the legacy Gate application and its login/UI behavior. Its full source and reproducible build recipe are not present here. Therefore the current image is **not login-free**, and this change does not claim to remove the Gbox login. See [the no-login runtime migration plan](docs/NO-LOGIN-MIGRATION.md).
 
-## Boot components
+## Current and target boot components
 
-The workflow extracts these files from the committed source image:
-
-| Output path | Source path | Purpose |
+| Component | Current repository state | Target |
 |---|---|---|
-| `boot/vmlinuz` | `BOOT/VMLINUZ` | Linux kernel |
-| `boot/select.img` | `BOOT/GATE.IMG` | Legacy Gate initramfs, renamed for SelectOS layout |
-| `EFI/BOOT/BOOTX64.EFI` | `EFI/BOOT/BOOTX64.EFI` | UEFI removable-media boot manager |
-| `EFI/BOOT/grubx64.efi` | `EFI/BOOT/GRUBX64.EFI` | GRUB EFI executable |
-| `EFI/BOOT/mmx64.efi` | `EFI/BOOT/MMX64.EFI` | MokManager executable |
+| UEFI / GRUB | Existing EFI binaries and GRUB configs | Retain, then validate |
+| Kernel | Extracted from legacy source image | Retain initially |
+| Initramfs / PID 1 | Prebuilt Gate/Gbox binary | Native SelectOS initramfs with no login gate |
+| OS detection / selector | Legacy implementation | Native SelectOS implementation |
+| Central authentication | Prototype server/client source only; not in boot path | Deferred; add later as optional LAN service |
 
-No release asset or separate boot-binaries archive is required. Keep `gate-test.img.gz` in the repository root.
+## Authentication is deferred
 
-## Legacy runtime compatibility
+- No authentication server, PostgreSQL service, login client, or network connection is required to boot or use the selector.
+- Existing `auth/server` and `auth/client` source is retained for future work; it is not installed into the boot image.
+- Do not add an authentication prompt or make boot conditional on successful authentication in the initial login-free milestone.
+- The old Gate/Gbox login cannot be removed by editing GRUB or the image packager. The initramfs/PID 1 runtime must be replaced or rebuilt from complete source.
 
-The original initramfs is still the Gate runtime binary. It expects the on-image configuration file `/gate.json` and marker file `/gate.marker`. The builder therefore copies `config/select.json` to `gate.json` and creates `gate.marker`, while the user-facing branding and GRUB menu use SelectOS. Do not rename these internal compatibility paths unless the initramfs itself is rebuilt and tested.
+## Legacy image build (temporary compatibility only)
 
-The original initramfs also contains the legacy Gate application binary. The visible branding is supplied through `config/select.json`; this does not recompile or rename the internal program.
+The current image builder can package the legacy runtime only when explicitly opted into. This is a transitional artifact, **not the login-free release**.
 
-## Build with GitHub Actions
+GitHub Actions:
+1. Open **Actions**.
+2. Select **Build legacy-compatible SelectOS image**.
+3. Run the workflow on `main`.
+4. The artifact is named `SelectOS-legacy-Gate-runtime` and includes a build manifest warning that the legacy login remains.
 
-1. Open **Actions** in this repository.
-2. Select **Build SelectOS image**.
-3. Click **Run workflow**.
-4. Run the workflow on the `main` branch.
-
-The workflow checks and decompresses `gate-test.img.gz`, mounts its partition, extracts the five boot files, and runs the image builder. On success, it uploads an artifact named **SelectOS-image** containing `SelectOS.img` (retained for 14 days).
-
-## Build locally
-
-On an Ubuntu/Debian system, decompress and mount the source image, then place the five extracted files in the paths listed above. Install the build dependencies and run:
+Local build on Ubuntu/Debian:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y parted dosfstools util-linux
-sudo bash scripts/build-image.sh
+sudo SELECTOS_ALLOW_LEGACY_GATE_RUNTIME=1 bash scripts/build-image.sh
 ```
 
-This creates `dist/SelectOS.img`, a 512 MiB FAT32 UEFI image.
+The output is `dist/SelectOS.img`, a 512 MiB FAT32 UEFI image. The explicit opt-in is deliberate: it prevents the legacy binary from being mistaken for the future login-free runtime.
 
-## Write to USB
+**Do not write a legacy artifact to a production USB expecting the Gbox login to be gone.**
 
-**Warning:** writing an image erases the selected device. Verify the device path carefully before running this command.
+## No-login runtime implementation
 
-```bash
-sudo dd if=dist/SelectOS.img of=/dev/sdX bs=4M status=progress oflag=sync
-```
-
-Replace `/dev/sdX` with the correct USB device. Never guess the device name.
+Read [docs/NO-LOGIN-MIGRATION.md](docs/NO-LOGIN-MIGRATION.md) for the required source tree, boot contract, implementation phases, acceptance tests, and the precise reason a new login-free bootable image cannot yet be built from the files currently available.
 
 ## Configuration
 
-Edit `config/select.json` to change SelectOS branding and operating-system presentation rules. The legacy initramfs reads this file at runtime through the compatibility copy at `/gate.json`.
+Edit `config/select.json` for the current legacy selector's branding and OS presentation rules. The legacy initramfs reads the compatibility copy at `/gate.json`. A native runtime should define and document its own stable configuration schema rather than silently assuming these legacy paths.
 
 ## Project structure
 
 ```text
 SelectOS/
-├── .github/workflows/build-image.yml
-├── gate-test.img.gz
+├── .github/workflows/
+├── auth/                    # future LAN authentication source; not in boot path
+├── boot/                    # kernel, initramfs and GRUB files
 ├── config/select.json
-├── boot/grub/grub.cfg
-├── EFI/BOOT/grub.cfg
+├── docs/NO-LOGIN-MIGRATION.md
 ├── scripts/build-image.sh
-├── icons/
-└── src/
+└── src/                     # native runtime source to be implemented
 ```
 
-## Known limitations and next steps
+## Release status
 
-- The initramfs and its embedded Gate application are supplied as a prebuilt binary; their source and reproducible build recipe are not included.
-- The legacy runtime still contains Gate-specific internal strings and compatibility paths. The JSON branding changes the displayed product name, but does not recompile the program.
-- The image layout and firmware behavior still need a successful GitHub Actions build and a real UEFI boot test before calling the image production-ready.
+A buildable image is not automatically a verified bootable system. Every release needs a successful image build, artifact inspection, and real UEFI testing on representative hardware.
 
 ## License
 
