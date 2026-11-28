@@ -43,7 +43,7 @@ fi
 while IFS= read -r library; do
   [[ -n "$library" && -f "$library" ]] || continue
   install -D -m 0755 "$library" "$WORK/root$library"
-done < <(awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^\\//) { print $i; break } }' "$WORK/blkid.ldd")
+done < <(awk '{ for (i = 1; i <= NF; i++) if (substr($i, 1, 1) == "/") { print $i; break } }' "$WORK/blkid.ldd")
 install -m 0755 "$BLKID_BIN" "$WORK/root/sbin/blkid"
 install -m 0755 "$SRC/init" "$WORK/root/init"
 install -m 0755 "$SRC/efi-menu" "$WORK/root/sbin/selectos-efi-menu"
