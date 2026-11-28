@@ -1,60 +1,67 @@
-# Experimental native image build
+# Experimental native SelectOS image
 
-This procedure creates a **separate experimental UEFI image** using the native
-PID 1/initramfs bring-up prototype. It does not replace the legacy image and it
-does not claim to boot Windows or Linux.
+This procedure builds a separate experimental x86_64 UEFI image. It does not
+replace the legacy image or claim production readiness.
 
-## Inputs
-
-The build expects these source inputs to be staged in the repository:
-
-- `boot/vmlinuz`: compatible x86_64 Linux kernel
-- `EFI/BOOT/BOOTX64.EFI`, `grubx64.efi`, `mmx64.efi`
-- GRUB configuration files under `EFI/BOOT` and `boot/grub`
-- `config/select.json`
-- `dist/native/select-native.img`, produced by `scripts/build-native-initramfs.sh`
-
-The native initramfs build requires static BusyBox, cpio, gzip, coreutils, and
-file. The image packaging step additionally requires parted, dosfstools,
-util-linux, and root privileges.
-
-## Build
+## Build dependencies
 
 On Debian/Ubuntu:
 
-```sh
+\`\`\`sh
 sudo apt-get update
-sudo apt-get install -y busybox-static cpio gzip coreutils file parted dosfstools util-linux
+sudo apt-get install -y gcc binutils gnu-efi busybox-static cpio gzip coreutils file parted dosfstools util-linux
+sudo bash scripts/build-uefi-loader.sh
 sudo bash scripts/build-native-initramfs.sh
 sudo SELECTOS_BUILD_NATIVE_EXPERIMENTAL=1 bash scripts/build-native-image.sh
-```
+\`\`\`
 
-Output: `dist/native/SelectOS-native-experimental.img`.
+The UEFI application is emitted as \`dist/native/selectos.efi\`. The native
+image is emitted as \`dist/native/SelectOS-native-experimental.img\`. Both
+builders refuse to overwrite existing outputs. Set
+\`SELECTOS_UEFI_LOADER_OUT\` or \`SELECTOS_NATIVE_IMAGE_OUT\` to choose a
+different path.
 
-The image builder refuses to overwrite an existing output. To choose another
-path, set `SELECTOS_NATIVE_IMAGE_OUT`; to change the image size, set
-`SELECTOS_NATIVE_IMAGE_SIZE_MB` (minimum 128 MiB). It never removes the
-repository's `dist` directory or the legacy `dist/SelectOS.img`.
+## UEFI-stage boot manager (experimental)
 
-## Current behavior and limitations
+The GRUB menu includes an explicit **SelectOS UEFI Boot Manager
+(experimental)** entry. The existing native Linux diagnostic boot remains the
+default. Choosing the UEFI entry chainloads
+\`EFI/SelectOS/selectos.efi\` while UEFI Boot Services are still available.
 
-The kernel starts the native `/init` and displays a diagnostic console. This
-proves only that the experimental kernel/initramfs packaging path can be
-assembled. The current initramfs does not yet include the host-side Python EFI
-scanner or selector, does not implement a graphical/keyboard OS menu, and does
-not chainload an installed operating system.
+The application enumerates UEFI Simple File System volumes, opens only a
+fixed allowlist of common loader paths read-only, and presents a firmware
+keyboard menu. On selection it creates a file device path and calls UEFI
+\`LoadImage\` and \`StartImage\` to hand control to the selected loader. It
+does not pass input to a shell, construct arbitrary paths, change
+\`BootOrder\`/\`BootNext\`, write NVRAM variables, or call \`ExitBootServices\`.
+If a child loader returns, the menu is shown again.
 
-The image manifest explicitly marks the build as not production-ready. Do not
-flash it as a replacement for a working multi-boot system. Validate it first
-with QEMU/OVMF, then representative physical UEFI hardware after the runtime
-and handoff implementation is complete.
+This is an initial handoff implementation, not a complete production boot
+manager. It scans UEFI-readable filesystem volumes rather than proving each
+volume is a GPT EFI System Partition. It recognizes only the allowlisted
+paths in \`src/uefi/boot-manager.c\`; vendor-specific layouts, other CPU
+architectures, and all Linux distributions are not covered.
 
-## Safety
+## Secure Boot
 
-- No partition is created, formatted, repaired, or written on a host disk.
-  The script creates a file-backed image and formats only its loop partition.
-- Existing legacy image outputs are not overwritten.
-- Discovery remains read-only; discovered EFI executables are never run by
-  the scanner.
-- Control Center, LAN, internet, authentication, and PostgreSQL are not boot
-  dependencies.
+The generated GNU-EFI application is **unsigned**. With Secure Boot enabled,
+firmware or an enforcing shim/GRUB may reject it unless signed by a key trusted
+by that machine. SelectOS does not disable Secure Boot, bypass signature
+checks, enroll keys, or modify MOK/NVRAM. A future signed release needs a
+reproducible signing and key-management process. Do not disable Secure Boot
+merely to test this experimental build.
+
+The selected OS loader is passed through firmware \`LoadImage\`; this
+application does not patch or bypass image authentication. Secure Boot
+behavior has not been verified across firmware implementations.
+
+## Validation and release limits
+
+CI compiles the PE/COFF x86_64 EFI application, checks its file type, runs
+source safety tests, and builds both image artifacts. This does not prove
+compatibility with every UEFI implementation. QEMU/OVMF integration tests and
+physical hardware testing remain required.
+
+The manifest intentionally retains \`PRODUCTION_READY=false\`. Keep a known
+working boot path and do not replace a production bootloader with this
+experimental image.

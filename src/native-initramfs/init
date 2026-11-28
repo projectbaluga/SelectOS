@@ -1,11 +1,11 @@
 #!/bin/busybox sh
-# Experimental native SelectOS PID 1. Diagnostic bring-up only; no OS chainloader.
+# Experimental native SelectOS PID 1. Read-only EFI menu; no chainloader yet.
 export PATH=/bin:/sbin HOME=/ TERM=linux
 bb() { /bin/busybox "$@"; }
 log() { printf '[SelectOS] %s\n' "$*"; }
 
 bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
-bb mkdir -p /proc /sys /run /dev/pts /tmp /mnt
+bb mkdir -p /proc /sys /run /dev/pts /tmp /mnt /sbin
 bb mount -t proc proc /proc 2>/dev/null || true
 bb mount -t sysfs sysfs /sys 2>/dev/null || true
 bb mount -t devpts devpts /dev/pts 2>/dev/null || true
@@ -36,12 +36,18 @@ for node in /sys/class/block/*; do
   found=1
 done
 [ "$found" -eq 1 ] || log "No block devices detected yet."
+
+if [ -x /sbin/selectos-efi-menu ]; then
+  /sbin/selectos-efi-menu || log "EFI menu exited with a diagnostic error."
+else
+  log "Read-only EFI menu is not installed in this initramfs."
+fi
+
 cat <<'NOTICE'
 
-This build is a runtime bring-up milestone only.
-OS detection, selector UI, and UEFI chainloading are not implemented yet.
-The existing production/legacy boot image has not been modified.
-Press Enter to keep this diagnostic console open.
+This build is an experimental bring-up milestone.
+EFI discovery is read-only and menu selection is diagnostic only.
+No EFI program is executed and no UEFI boot variable is changed.
 NOTICE
 while :; do
   IFS= read -r _answer </dev/console 2>/dev/null || bb sleep 3600

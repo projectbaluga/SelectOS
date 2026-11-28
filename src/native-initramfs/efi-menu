@@ -1,0 +1,117 @@
+#!/bin/busybox sh
+# Read-only EFI System Partition scanner and keyboard menu for native initramfs.
+# This intentionally records a choice only; it never executes an EFI binary.
+PATH=/bin:/sbin
+export PATH
+SYS_BLOCK="${SELECTOS_SYS_BLOCK:-/sys/class/block}"
+DEV_ROOT="${SELECTOS_DEV_ROOT:-/dev}"
+MOUNT_ROOT="${SELECTOS_MOUNT_ROOT:-/run/selectos-efi}"
+CONSOLE="${SELECTOS_CONSOLE:-/dev/console}"
+BLKID="${SELECTOS_BLKID:-/sbin/blkid}"
+MOUNT="${SELECTOS_MOUNT:-/bin/mount}"
+UMOUNT="${SELECTOS_UMOUNT:-/bin/umount}"
+ESP_GUID="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+WORK="${MOUNT_ROOT}.$$"
+ENTRIES="$WORK/entries"
+COUNT=0
+
+say() { printf '[SelectOS] %s\n' "$*"; }
+cleanup() {
+  # Every mount target is unmounted immediately after inspection. This is a
+  # final best-effort guard for an interrupted scan.
+  if [ -d "$WORK" ]; then
+    mounted=0
+    for target in "$WORK"/*; do
+      [ -d "$target" ] || continue
+      if ! "$UMOUNT" "$target" 2>/dev/null; then mounted=1; fi
+    done
+    if [ "$mounted" -eq 0 ]; then
+      /bin/rm -rf "$WORK"
+    else
+      say "WARNING: could not unmount a read-only ESP; leaving its temporary mount directory intact."
+    fi
+  fi
+}
+trap cleanup EXIT HUP INT TERM
+
+[ -d "$SYS_BLOCK" ] || { say "EFI discovery unavailable: sysfs block directory missing."; exit 0; }
+[ -x "$BLKID" ] || { say "EFI discovery unavailable: blkid applet missing."; exit 0; }
+mkdir -p "$WORK" "$MOUNT_ROOT" || { say "Cannot create temporary scan directory."; exit 0; }
+: > "$ENTRIES"
+
+for node in "$SYS_BLOCK"/*; do
+  [ -f "$node/partition" ] || continue
+  name=${node##*/}
+  case "$name" in loop*|ram*) continue ;; esac
+  device="$DEV_ROOT/$name"
+  [ -b "$device" ] || [ -e "$device" ] || continue
+
+  guid=$("$BLKID" -s PART_ENTRY_TYPE -o value "$device" 2>/dev/null | /bin/tr 'A-F' 'a-f' | /bin/tr -d '{}')
+  [ "$guid" = "$ESP_GUID" ] || continue
+  uuid=$("$BLKID" -s PARTUUID -o value "$device" 2>/dev/null | /bin/tr -d '\r\n')
+  target="$WORK/$name"
+  mkdir -p "$target" || continue
+
+  # ESPs are only ever mounted read-only, without device execution or suid.
+  if ! "$MOUNT" -t vfat -o ro,nosuid,nodev,noexec "$device" "$target" >/dev/null 2>&1; then
+    rmdir "$target" 2>/dev/null || true
+    continue
+  fi
+
+  for loader in \
+    EFI/Microsoft/Boot/bootmgfw.efi \
+    EFI/Boot/bootx64.efi \
+    EFI/Boot/bootaa64.efi \
+    EFI/ubuntu/shimx64.efi \
+    EFI/ubuntu/grubx64.efi \
+    EFI/debian/shimx64.efi \
+    EFI/debian/grubx64.efi \
+    EFI/fedora/shimx64.efi \
+    EFI/fedora/grubx64.efi \
+    EFI/systemd/systemd-bootx64.efi \
+    EFI/systemd/systemd-bootaa64.efi
+  do
+    if [ -f "$target/$loader" ]; then
+      printf '%s|%s|%s\n' "$device" "$uuid" "$loader" >> "$ENTRIES"
+    fi
+  done
+
+  "$UMOUNT" "$target" 2>/dev/null || true
+  rmdir "$target" 2>/dev/null || true
+done
+
+COUNT=$(/bin/busybox wc -l < "$ENTRIES" | /bin/busybox tr -d ' ')
+if [ "${COUNT:-0}" -eq 0 ]; then
+  say "Walang kilalang EFI loader na nakita; walang binagong disk o firmware setting."
+  exit 0
+fi
+
+say "Nakita ang mga kilalang EFI loader (read-only scan):"
+index=0
+while IFS='|' read -r device uuid loader; do
+  index=$((index + 1))
+  case "$loader" in EFI/Microsoft/*) family="Windows" ;; *) family="Linux / EFI" ;; esac
+  printf '  %s) %s — %s — %s\n' "$index" "$family" "$device" "$loader"
+done < "$ENTRIES"
+printf '  q) Bumalik sa diagnostic console\n'
+printf 'Piliin ang entry number: '
+
+choice=""
+IFS= read -r choice < "$CONSOLE" || choice="q"
+case "$choice" in
+  q|Q|"") say "Walang piniling boot entry; bumabalik sa diagnostic console."; exit 0 ;;
+esac
+case "$choice" in *[!0-9]*)
+  say "Hindi valid ang pinili; walang binagong boot setting."
+  exit 0
+  ;;
+esac
+[ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le "$COUNT" ] || {
+  say "Wala sa listahan ang pinili; walang binagong boot setting."
+  exit 0
+}
+selected=$( /bin/busybox sed -n "${choice}p" "$ENTRIES" )
+say "Napili: $selected"
+say "Hindi pa available ang UEFI handoff; walang EFI program na inilunsad."
+say "Bumabalik sa diagnostic console."
+exit 0
