@@ -5,7 +5,7 @@
 #define MAX_BOOT_ENTRIES 64
 #define EFI_SIMPLE_FS_GUID { 0x964e5b22, 0x6459, 0x11d2, { 0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b } }
 static EFI_GUID SimpleFsGuid = EFI_SIMPLE_FS_GUID;
-typedef struct { EFI_HANDLE Device; const CHAR16 *Path; const CHAR16 *Label; } BOOT_ENTRY;
+typedef struct { EFI_HANDLE Device; CHAR16 Path[128]; CHAR16 Label[64]; } BOOT_ENTRY;
 static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
@@ -73,158 +73,269 @@ static UINTN ConsoleWriteString(const CHAR16 *Text) {
     uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, (CHAR16 *)Text);
     return Count;
 }
-static VOID ConsoleWriteChar(CHAR16 Character) {
-    CHAR16 Text[2];
-    Text[0] = Character;
-    Text[1] = 0;
-    if (ST != NULL && ST->ConOut != NULL)
-        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Text);
+static VOID AppendChar(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, CHAR16 Value) {
+    if (*Length + 1 < Capacity) Buffer[(*Length)++] = Value;
 }
-static UINTN ConsoleWriteNumber(UINTN Value) {
+static VOID AppendString(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, const CHAR16 *Value) {
+    UINTN i;
+    if (Value == NULL) return;
+    for (i = 0; Value[i] != 0 && *Length + 1 < Capacity; ++i)
+        Buffer[(*Length)++] = Value[i];
+}
+static VOID AppendNumber(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, UINTN Value) {
     CHAR16 Digits[24];
     UINTN Count = 0, i;
-    if (Value == 0) {
-        ConsoleWriteChar(L'0');
-        return 1;
-    }
-    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0])) {
-        Digits[Count++] = (CHAR16)(L'0' + (Value % 10));
-        Value /= 10;
-    }
-    for (i = Count; i > 0; --i) ConsoleWriteChar(Digits[i - 1]);
-    return Count;
+    do { Digits[Count++] = (CHAR16)(L'0' + (Value % 10)); Value /= 10; }
+    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
+    for (i = Count; i > 0; --i) AppendChar(Buffer, Length, Capacity, Digits[i - 1]);
 }
-static UINTN ConsoleWriteHex(UINTN Value) {
+static VOID AppendHex(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, UINTN Value) {
     static const CHAR16 Hex[] = L"0123456789ABCDEF";
     CHAR16 Digits[2 * sizeof(UINTN)];
     UINTN Count = 0, i;
-    ConsoleWriteString(L"0x");
-    do {
-        Digits[Count++] = Hex[Value & 0x0f];
-        Value >>= 4;
-    } while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
-    for (i = Count; i > 0; --i) ConsoleWriteChar(Digits[i - 1]);
-    return Count + 2;
+    AppendString(Buffer, Length, Capacity, L"0x");
+    do { Digits[Count++] = Hex[Value & 0x0f]; Value >>= 4; }
+    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
+    for (i = Count; i > 0; --i) AppendChar(Buffer, Length, Capacity, Digits[i - 1]);
 }
-/* Minimal local formatter: avoid GNU-EFI Print/CatPrint library code, which
- * may contain instructions newer than the baseline x86-64 ISA.
+static UINTN ConsoleWriteHex(UINTN Value) {
+    CHAR16 Buffer[2 * sizeof(UINTN) + 3];
+    UINTN Length = 0;
+    AppendHex(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), Value);
+    Buffer[Length] = 0;
+    return ConsoleWriteString(Buffer);
+}
+/* Format into one UTF-16 buffer and call OutputString once. Some firmware
+ * console implementations do not reliably handle a stream of one-character
+ * OutputString calls, especially when output is redirected to a serial log.
  */
 static UINTN LocalPrint(const CHAR16 *Format, ...) {
+    CHAR16 Buffer[1024];
+    UINTN Length = 0, i;
     va_list Args;
-    UINTN Count = 0, i;
     va_start(Args, Format);
-    for (i = 0; Format != NULL && Format[i] != 0; ++i) {
+    for (i = 0; Format != NULL && Format[i] != 0 && Length + 1 < sizeof(Buffer) / sizeof(Buffer[0]); ++i) {
         if (Format[i] != L'%') {
-            ConsoleWriteChar(Format[i]);
-            ++Count;
+            AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), Format[i]);
             continue;
         }
         ++i;
         if (Format[i] == 0) break;
         switch (Format[i]) {
-            case L's': {
-                const CHAR16 *Text = va_arg(Args, const CHAR16 *);
-                Count += ConsoleWriteString(Text);
+            case L's':
+                AppendString(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), va_arg(Args, const CHAR16 *));
                 break;
-            }
             case L'u':
-                Count += ConsoleWriteNumber(va_arg(Args, UINTN));
+                AppendNumber(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), va_arg(Args, UINTN));
                 break;
             case L'c':
-                ConsoleWriteChar((CHAR16)va_arg(Args, int));
-                ++Count;
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), (CHAR16)va_arg(Args, int));
                 break;
             case L'r':
-                Count += ConsoleWriteHex((UINTN)va_arg(Args, EFI_STATUS));
+                AppendHex(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), (UINTN)va_arg(Args, EFI_STATUS));
                 break;
             case L'%':
-                ConsoleWriteChar(L'%');
-                ++Count;
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), L'%');
                 break;
             default:
-                ConsoleWriteChar(L'%');
-                ConsoleWriteChar(Format[i]);
-                Count += 2;
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), L'%');
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), Format[i]);
                 break;
         }
     }
     va_end(Args);
-    return Count;
+    Buffer[Length] = 0;
+    return ConsoleWriteString(Buffer);
 }
-static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] = {
-    { L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", L"Windows Boot Manager" },
-    { L"\\EFI\\ubuntu\\shimx64.efi", L"Ubuntu (shim)" },
-    { L"\\EFI\\ubuntu\\grubx64.efi", L"Ubuntu (GRUB)" },
-    { L"\\EFI\\debian\\shimx64.efi", L"Debian (shim)" },
-    { L"\\EFI\\debian\\grubx64.efi", L"Debian (GRUB)" },
-    { L"\\EFI\\fedora\\shimx64.efi", L"Fedora (shim)" },
-    { L"\\EFI\\fedora\\grubx64.efi", L"Fedora (GRUB)" },
-    { L"\\EFI\\opensuse\\shim.efi", L"openSUSE (shim)" },
-    { L"\\EFI\\systemd\\systemd-bootx64.efi", L"systemd-boot" },
-    { L"\\EFI\\refind\\refind_x64.efi", L"rEFInd" }
-};
+#define KNOWN_LOADER_COUNT 10
 
+static BOOLEAN CopyAsciiToChar16(const char *Source, CHAR16 *Destination, UINTN Capacity) {
+    UINTN i = 0;
+    if (Source == NULL || Destination == NULL || Capacity == 0) return FALSE;
+    while (Source[i] != 0 && i + 1 < Capacity) {
+        Destination[i] = (CHAR16)(UINT8)Source[i];
+        ++i;
+    }
+    if (Source[i] != 0) return FALSE;
+    Destination[i] = 0;
+    return TRUE;
+}
+static UINTN LoaderPrefixCount(UINTN LoaderIndex) {
+    if (LoaderIndex >= KNOWN_LOADER_COUNT) return 0;
+    return LoaderIndex == 0 ? 4 : 3;
+}
+static BOOLEAN BuildLoaderPrefix(UINTN LoaderIndex, UINTN PrefixIndex, CHAR16 *Buffer, UINTN Capacity) {
+    if (LoaderIndex >= KNOWN_LOADER_COUNT || PrefixIndex >= LoaderPrefixCount(LoaderIndex)) return FALSE;
+    switch (LoaderIndex) {
+        case 0:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\Microsoft", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\Microsoft\\Boot", Buffer, Capacity);
+                case 3: return CopyAsciiToChar16("\\EFI\\Microsoft\\Boot\\bootmgfw.efi", Buffer, Capacity);
+            }
+            break;
+        case 1:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\ubuntu", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\ubuntu\\shimx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 2:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\ubuntu", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\ubuntu\\grubx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 3:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\debian", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\debian\\shimx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 4:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\debian", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\debian\\grubx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 5:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\fedora", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\fedora\\shimx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 6:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\fedora", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\fedora\\grubx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 7:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\opensuse", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\opensuse\\shim.efi", Buffer, Capacity);
+            }
+            break;
+        case 8:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\systemd", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\systemd\\systemd-bootx64.efi", Buffer, Capacity);
+            }
+            break;
+        case 9:
+            switch (PrefixIndex) {
+                case 0: return CopyAsciiToChar16("\\EFI", Buffer, Capacity);
+                case 1: return CopyAsciiToChar16("\\EFI\\refind", Buffer, Capacity);
+                case 2: return CopyAsciiToChar16("\\EFI\\refind\\refind_x64.efi", Buffer, Capacity);
+            }
+            break;
+    }
+    return FALSE;
+}
+static BOOLEAN BuildLoaderPath(UINTN LoaderIndex, CHAR16 *Buffer, UINTN Capacity) {
+    UINTN Count = LoaderPrefixCount(LoaderIndex);
+    return Count != 0 && BuildLoaderPrefix(LoaderIndex, Count - 1, Buffer, Capacity);
+}
+static BOOLEAN BuildLoaderLabel(UINTN LoaderIndex, CHAR16 *Buffer, UINTN Capacity) {
+    switch (LoaderIndex) {
+        case 0: return CopyAsciiToChar16("Windows Boot Manager", Buffer, Capacity);
+        case 1: return CopyAsciiToChar16("Ubuntu (shim)", Buffer, Capacity);
+        case 2: return CopyAsciiToChar16("Ubuntu (GRUB)", Buffer, Capacity);
+        case 3: return CopyAsciiToChar16("Debian (shim)", Buffer, Capacity);
+        case 4: return CopyAsciiToChar16("Debian (GRUB)", Buffer, Capacity);
+        case 5: return CopyAsciiToChar16("Fedora (shim)", Buffer, Capacity);
+        case 6: return CopyAsciiToChar16("Fedora (GRUB)", Buffer, Capacity);
+        case 7: return CopyAsciiToChar16("openSUSE (shim)", Buffer, Capacity);
+        case 8: return CopyAsciiToChar16("systemd-boot", Buffer, Capacity);
+        case 9: return CopyAsciiToChar16("rEFInd", Buffer, Capacity);
+        default: return FALSE;
+    }
+}
 static VOID PauseForKey(VOID) {
     EFI_INPUT_KEY key;
     while (uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key) == EFI_NOT_READY)
         uefi_call_wrapper(BS->Stall, 1, 100000);
 }
-static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
-    EFI_FILE_HANDLE Current = Root, Next = NULL;
-    CHAR16 Component[256];
-    UINTN i = 0, j = 0;
+static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, UINTN LoaderIndex) {
+    EFI_FILE_HANDLE Current = Root;
     BOOLEAN OwnsCurrent = FALSE;
-    if (Root == NULL || Path == NULL) return NULL;
-
-    /* Walk one component at a time. This avoids firmware-specific differences
-     * in how root handles parse multi-component absolute/relative paths.
-     */
-    while (Path[i] == L'\\\\' || Path[i] == L'/') ++i;
-    for (;;) {
-        j = 0;
-        while (Path[i] != 0 && Path[i] != L'\\\\' && Path[i] != L'/') {
-            if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
-                if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
-                return NULL;
-            }
-            Component[j++] = Path[i++];
-        }
-        if (j == 0) {
+    UINTN i, PrefixCount = LoaderPrefixCount(LoaderIndex);
+    if (Root == NULL || PrefixCount == 0) return NULL;
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    if (LoaderIndex == 2) {
+        CHAR16 Marker[] = L"SELECTOS_PATH_ENTRY\r\n";
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+    }
+#endif
+    /* Build writable UTF-16 path buffers from ASCII literals in this function. */
+    for (i = 0; i < PrefixCount; ++i) {
+        EFI_FILE_HANDLE Next = NULL;
+        EFI_STATUS OpenStatus;
+        CHAR16 FileName[128];
+        if (!BuildLoaderPrefix(LoaderIndex, i, FileName, sizeof(FileName) / sizeof(FileName[0]))) {
             if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
             return NULL;
         }
-        Component[j] = 0;
-        Next = NULL;
-        {
-            EFI_STATUS OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next, Component,
-                                                       EFI_FILE_MODE_READ, 0);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-            if (EFI_ERROR(OpenStatus) || Next == NULL) {
-                ConsoleWriteString(L"SELECTOS_COMPONENT_OPEN_FAILED: ");
-                ConsoleWriteString(Component);
-                ConsoleWriteString(L" status=");
-                ConsoleWriteHex((UINTN)OpenStatus);
-                ConsoleWriteString(L"\\r\\n");
-            }
+        if (LoaderIndex == 2) {
+            if (i == 0) { CHAR16 M[] = L"SELECTOS_COMPONENT_EFI\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            else if (i == 1) { CHAR16 M[] = L"SELECTOS_COMPONENT_UBUNTU\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            else if (i == 2) { CHAR16 M[] = L"SELECTOS_COMPONENT_GRUB\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+        }
 #endif
+        OpenStatus = uefi_call_wrapper(Root->Open, 5, Root, &Next,
+                                       FileName, (UINT64)EFI_FILE_MODE_READ, (UINT64)0);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        if (LoaderIndex == 2) {
             if (EFI_ERROR(OpenStatus) || Next == NULL) {
-                if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
-                return NULL;
+                if (OpenStatus == EFI_NOT_FOUND) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_NOT_FOUND\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_ACCESS_DENIED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_ACCESS_DENIED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_INVALID_PARAMETER) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_INVALID_PARAMETER\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_UNSUPPORTED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_UNSUPPORTED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_DEVICE_ERROR) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_DEVICE_ERROR\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_NO_MEDIA) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_NO_MEDIA\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_MEDIA_CHANGED) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_MEDIA_CHANGED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_TIMEOUT) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_TIMEOUT\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_COMPROMISED_DATA) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_COMPROMISED_DATA\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else if (OpenStatus == EFI_SUCCESS && Next == NULL) { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_SUCCESS_NULL_HANDLE\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+                else { CHAR16 M[] = L"SELECTOS_COMPONENT_STATUS_OTHER\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            } else {
+                CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_OPENED\r\n";
+                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M);
             }
+        }
+#endif
+        if (EFI_ERROR(OpenStatus) || Next == NULL) {
+            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+            return NULL;
         }
         if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
         Current = Next;
         OwnsCurrent = TRUE;
-        while (Path[i] == L'\\\\' || Path[i] == L'/') ++i;
-        if (Path[i] == 0) return Current;
     }
-}
-static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
-    EFI_FILE_HANDLE File = OpenPathFromRoot(Root, Path);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    if (Path == KnownLoaders[2].Path) {
-        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\\r\\n";
-        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\\r\\n";
+    if (LoaderIndex == 2) {
+        CHAR16 Marker[] = L"SELECTOS_PATH_FINAL_OPENED\r\n";
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+    }
+#endif
+    return Current;
+}
+static BOOLEAN FileExists(EFI_FILE_HANDLE Root, UINTN LoaderIndex) {
+    EFI_FILE_HANDLE File = OpenPathFromRoot(Root, LoaderIndex);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    if (LoaderIndex == 2) {
+        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\r\n";
+        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n";
         if (File != NULL) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         else uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Missing);
     }
@@ -261,16 +372,16 @@ static VOID ScanVolume(EFI_HANDLE Device) {
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
-    for (j = 0; j < sizeof(KnownLoaders) / sizeof(KnownLoaders[0]); ++j) {
+    for (j = 0; j < KNOWN_LOADER_COUNT; ++j) {
         if (EntryCount >= MAX_BOOT_ENTRIES) break;
-        if (FileExists(Root, KnownLoaders[j].Path)) {
+        if (FileExists(Root, j)) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
             CHAR16 Marker[] = L"SELECTOS_SCAN_ALLOWLISTED_LOADER_FOUND\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
 #endif
             Entries[EntryCount].Device = Device;
-            Entries[EntryCount].Path = KnownLoaders[j].Path;
-            Entries[EntryCount].Label = KnownLoaders[j].Label;
+            if (!BuildLoaderPath(j, Entries[EntryCount].Path, sizeof(Entries[EntryCount].Path) / sizeof(Entries[EntryCount].Path[0])) ||
+                !BuildLoaderLabel(j, Entries[EntryCount].Label, sizeof(Entries[EntryCount].Label) / sizeof(Entries[EntryCount].Label[0]))) continue;
             ++EntryCount;
         }
     }
@@ -465,6 +576,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
     }
 #endif
     for (;;) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        { CHAR16 Marker[] = L"SELECTOS_LOOP_ENTERED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+#endif
         UINTN i, Selection;
         EFI_STATUS Status;
 #ifndef SELECTOS_QEMU_TEST_DIAGNOSTICS
@@ -473,7 +587,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         LocalPrint(L"SelectOS UEFI Boot Manager — experimental\r\n");
         LocalPrint(L"===========================================\r\n\r\n");
         LocalPrint(L"Scanning UEFI-readable filesystem volumes...\r\n");
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        { CHAR16 Marker[] = L"SELECTOS_SCAN_CALL_BEGIN\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+#endif
         ScanFilesystems(ImageHandle);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        { CHAR16 Marker[] = L"SELECTOS_SCAN_CALL_END\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+#endif
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         {
             CHAR16 Marker[] = L"SELECTOS_SCAN_RETURNED\r\n";
