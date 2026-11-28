@@ -92,7 +92,11 @@ PRODUCTION_READY=false
 WARNING=Experimental diagnostic image only; it does not yet select or boot installed operating systems.
 INFO
 sync
-cleanup
+umount "$MNT"
+rmdir "$MNT"
+MNT=""
+losetup -d "$LOOP"
+LOOP=""
 trap - EXIT
 mv -- "$TMP_OUT" "$OUT"
 
