@@ -166,9 +166,9 @@ static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
     EFI_STATUS Status = uefi_call_wrapper(Root->Open, 5, Root, &File, (CHAR16 *)Path, EFI_FILE_MODE_READ, 0);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (Path == KnownLoaders[2].Path) {
-        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\\r\\n";
-        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\\r\\n";
-        CHAR16 Failed[] = L"SELECTOS_TEST_CHILD_PATH_OPEN_FAILED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\r\n";
+        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n";
+        CHAR16 Failed[] = L"SELECTOS_TEST_CHILD_PATH_OPEN_FAILED\r\n";
         if (!EFI_ERROR(Status)) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         else if (Status == EFI_NOT_FOUND) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Missing);
         else uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Failed);
