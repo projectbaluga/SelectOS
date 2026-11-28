@@ -1,14 +1,16 @@
 name: Build SelectOS images
-
 on:
   pull_request:
     paths:
       - "scripts/build-image.sh"
       - "scripts/build-native-initramfs.sh"
       - "scripts/build-native-image.sh"
+      - "scripts/build-uefi-loader.sh"
       - "src/native-initramfs/**"
+      - "src/uefi/**"
       - "tests/test-native-image-builder.sh"
       - "tests/test-native-efi-menu.sh"
+      - "tests/test-uefi-loader.sh"
       - "tests/test-native-init.sh"
       - "tests/test-efi-discovery.py"
       - "tests/test-boot-selector.py"
@@ -21,10 +23,8 @@ on:
       - "EFI/**"
       - "gate-test.img.gz"
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build:
     name: Build legacy and experimental native images
@@ -32,12 +32,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y parted dosfstools util-linux gzip cpio busybox-static coreutils file
-
+          sudo apt-get install -y gcc binutils gnu-efi parted dosfstools util-linux gzip cpio busybox-static coreutils file
       - name: Extract kernel and UEFI boot files from compatibility source
         shell: bash
         run: |
@@ -58,82 +56,78 @@ jobs:
           mkdir -p "$WORK/source"
           gzip -dc "$SOURCE" > "$WORK/source.img"
           LOOP="$(sudo losetup --find --show --partscan "$WORK/source.img")"
-          PART="${LOOP}p1"
-          for attempt in {1..10}; do
-            [[ -b "$PART" ]] && break
-            sleep 1
-          done
+          PART="$\{LOOP}p1"
+          for attempt in {1..10}; do [[ -b "$PART" ]] && break; sleep 1; done
           [[ -b "$PART" ]] || { echo "::error::Could not find source image partition $PART"; exit 1; }
           sudo mount -o ro "$PART" "$WORK/source"
           mkdir -p boot EFI/BOOT
-          for file in BOOT/VMLINUZ BOOT/GATE.IMG EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do
-            sudo test -s "$WORK/source/$file"
-          done
+          for file in BOOT/VMLINUZ BOOT/GATE.IMG EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do sudo test -s "$WORK/source/$file"; done
           sudo cp "$WORK/source/BOOT/VMLINUZ" boot/vmlinuz
           sudo cp "$WORK/source/BOOT/GATE.IMG" boot/select.img
           sudo cp "$WORK/source/EFI/BOOT/BOOTX64.EFI" EFI/BOOT/BOOTX64.EFI
           sudo cp "$WORK/source/EFI/BOOT/GRUBX64.EFI" EFI/BOOT/grubx64.efi
           sudo cp "$WORK/source/EFI/BOOT/MMX64.EFI" EFI/BOOT/mmx64.efi
           sudo chown -R "$USER:$USER" boot EFI
-          for file in boot/vmlinuz EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
-            [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
-          done
-
+          for file in boot/vmlinuz EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }; done
       - name: Validate shell syntax and regression tests
         run: |
           bash -n scripts/build-image.sh
           bash -n scripts/build-native-initramfs.sh
           bash -n scripts/build-native-image.sh
+          bash -n scripts/build-uefi-loader.sh
           bash -n src/native-initramfs/init
           bash -n src/native-initramfs/efi-menu
           bash -n tests/test-native-image-builder.sh
           bash -n tests/test-native-efi-menu.sh
+          bash -n tests/test-uefi-loader.sh
           bash tests/test-native-image-builder.sh
           bash tests/test-native-efi-menu.sh
+          bash tests/test-uefi-loader.sh
           python3 tests/test-efi-discovery.py
           python3 tests/test-boot-selector.py
-
+      - name: Build experimental x86_64 UEFI boot manager
+        run: |
+          bash scripts/build-uefi-loader.sh
+          test -s dist/native/selectos.efi
+          file dist/native/selectos.efi
       - name: Build native experimental initramfs
         run: sudo bash scripts/build-native-initramfs.sh
-
       - name: Package native experimental image
         env:
           SELECTOS_BUILD_NATIVE_EXPERIMENTAL: "1"
         run: sudo --preserve-env=SELECTOS_BUILD_NATIVE_EXPERIMENTAL bash scripts/build-native-image.sh
-
-      - name: Verify native image manifest and checksum
+      - name: Verify native image manifest and checksums
         run: |
           test -s dist/native/select-native.img
+          test -s dist/native/selectos.efi
           test -s dist/native/SelectOS-native-experimental.img
           grep -q '^PRODUCTION_READY=false$' dist/native/IMAGE-BUILD-INFO.txt
-          grep -q '^OS_DISCOVERY=read-only-efi-esp-scan$' dist/native/IMAGE-BUILD-INFO.txt
-          grep -q '^BOOT_SELECTOR=keyboard-menu-selection-record-only$' dist/native/IMAGE-BUILD-INFO.txt
-          grep -q '^UEFI_CHAINLOADER=not-implemented$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^BOOT_SELECTOR=uefi-stage-menu-experimental$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^OS_DISCOVERY=uefi-simple-filesystem-allowlist$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^UEFI_CHAINLOADER=loadimage-startimage-experimental$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^UEFI_APP_SIGNED=false$' dist/native/IMAGE-BUILD-INFO.txt
           sha256sum --check dist/native/IMAGE-SHA256SUMS
-
       - name: Build explicitly marked legacy compatibility image
         env:
           SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
         run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
-
       - name: Verify legacy image and warning manifest
         run: |
           test -s dist/SelectOS.img
           grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
           grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
           file dist/SelectOS.img
-
       - name: Upload experimental native image artifact
         uses: actions/upload-artifact@v4
         with:
           name: SelectOS-native-experimental
           path: |
             dist/native/SelectOS-native-experimental.img
+            dist/native/selectos.efi
             dist/native/IMAGE-BUILD-INFO.txt
             dist/native/IMAGE-SHA256SUMS
           if-no-files-found: error
           retention-days: 7
-
       - name: Upload legacy compatibility image artifact
         uses: actions/upload-artifact@v4
         with:
@@ -143,33 +137,28 @@ jobs:
             dist/SELECTOS-BUILD-INFO.txt
           if-no-files-found: error
           retention-days: 14
-
   cleanup-finished-runs:
     name: Clean up completed workflow runs
     needs: build
-    # Pull-request runs can come from forks and must not receive an Actions write token.
-    # Cleanup runs after manual image builds, even if the build job fails.
-    if: ${{ always() && github.event_name != 'pull_request' }}
+    if: $\{\{ always() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
       - name: Delete previous completed workflow runs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: $\{\{ secrets.GITHUB_TOKEN }}
+          GH_REPO: $\{\{ github.repository }}
+          CURRENT_RUN_ID: $\{\{ github.run_id }}
         shell: bash
         run: |
           set -Eeuo pipefail
           echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
+          gh api --paginate "repos/$\{GH_REPO}/actions/runs?per_page=100" \
             --jq '.workflow_runs[] | select(.status == "completed") | .id' |
           while IFS= read -r run_id; do
             [[ -n "$run_id" ]] || continue
-            if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then
-              continue
-            fi
+            if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then continue; fi
             echo "Deleting completed workflow run $run_id"
-            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
+            gh api --method DELETE "repos/$\{GH_REPO}/actions/runs/$\{run_id}"
           done

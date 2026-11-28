@@ -23,7 +23,7 @@ LIBDIR="$(dirname "$LDS")"
 mkdir -p "$(dirname "$OUT")"
 [[ ! -e "$OUT" ]] || { echo "ERROR: Refusing to overwrite UEFI loader: $OUT" >&2; exit 1; }
 gcc -I/usr/include/efi -I/usr/include/efi/x86_64 -I/usr/include/efi/protocol \
-  -fpic -fshort-wchar -mno-red-zone -maccumulate-outgoing-args \
+  -fpic -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -fno-stack-protector \
   -DEFI_FUNCTION_WRAPPER -c "$SRC" -o "$WORK/boot-manager.o"
 ld -nostdlib -znocombreloc -T "$LDS" -shared -Bsymbolic \
   "$CRT" "$WORK/boot-manager.o" -L"$LIBDIR" -lefi -lgnuefi -o "$WORK/boot-manager.so"
