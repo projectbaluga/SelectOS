@@ -52,6 +52,7 @@ func main() {
 	mux.HandleFunc("POST /v1/admin/users", s.auth(s.admin(s.createUser)))
 	mux.HandleFunc("PATCH /v1/admin/users/{id}/status", s.auth(s.admin(s.setUserStatus)))
 	mux.HandleFunc("POST /v1/admin/users/{id}/password", s.auth(s.admin(s.resetPassword)))
+	registerControlCenter(s, mux)
 
 	srv := &http.Server{Addr:addr, Handler:securityHeaders(mux), ReadHeaderTimeout:5*time.Second, ReadTimeout:10*time.Second, WriteTimeout:15*time.Second, IdleTimeout:60*time.Second}
 	log.Printf("SelectOS auth server listening on %s", addr)
@@ -141,5 +142,5 @@ func hmac256(key,data []byte)[]byte{h:=hmac.New(sha256.New,key);h.Write(data);re
 func (s *Server) audit(u,event string,r *http.Request){ip,_,_:=net.SplitHostPort(r.RemoteAddr);_,_=s.db.Exec("INSERT INTO audit(username,event,remote_ip) VALUES($1,$2,$3)",u,event,ip)}
 func validUser(u string)bool{if len(u)<3||len(u)>32{return false};for _,r:=range u{if !(r>='a'&&r<='z'||r>='A'&&r<='Z'||r>='0'&&r<='9'||r=='_'||r=='-'||r=='.'){return false}};return true}
 func write(w http.ResponseWriter,status int,v any){w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_=json.NewEncoder(w).Encode(v)}
-func securityHeaders(next http.Handler)http.Handler{return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){w.Header().Set("X-Content-Type-Options","nosniff");w.Header().Set("Cache-Control","no-store");next.ServeHTTP(w,r)})}
+func securityHeaders(next http.Handler)http.Handler{return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){w.Header().Set("X-Content-Type-Options","nosniff");w.Header().Set("Cache-Control","no-store");w.Header().Set("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");w.Header().Set("X-Frame-Options","DENY");next.ServeHTTP(w,r)})}
 func env(k,d string)string{if v:=os.Getenv(k);v!=""{return v};return d}

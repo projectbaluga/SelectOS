@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light"><title>SelectOS Control Center</title>
+<link rel="stylesheet" href="/dashboard/styles.css">
+</head>
+<body>
+<header class="topbar"><div class="brand"><span class="brand-mark">S</span><div><strong>SelectOS</strong><small>CONTROL CENTER</small></div></div><div class="top-actions"><span id="connection" class="status">Not connected</span><button id="logout" class="quiet hidden">Sign out</button></div></header>
+<main>
+<section id="login" class="login-wrap"><div class="login-card"><p class="eyebrow">LOCAL SERVER MANAGEMENT</p><h1>Welcome back</h1><p class="muted">Sign in with a SelectOS administrator account. Dashboard access stays on your LAN.</p><form id="login-form"><label>Username<input id="username" autocomplete="username" required maxlength="64"></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Sign in</button><p id="login-error" class="error" role="alert"></p></form></div></section>
+<section id="app" class="hidden">
+<div class="page-head"><div><p class="eyebrow">OVERVIEW</p><h1>Server dashboard</h1><p class="muted" id="server-meta">Local server status and registered devices</p></div><button id="refresh" class="secondary">Refresh data</button></div>
+<div class="grid metrics">
+<article class="metric"><span>Registered PCs</span><strong id="registered">—</strong><small id="online-caption">Online status requires an agent heartbeat</small></article>
+<article class="metric"><span>Online PCs</span><strong id="online">—</strong><small>Seen within the last 2 minutes</small></article>
+<article class="metric"><span>Memory used</span><strong id="memory">—</strong><small id="memory-detail">Host memory</small></article>
+<article class="metric"><span>Disk used</span><strong id="disk">—</strong><small id="disk-detail">Root filesystem</small></article>
+</div>
+<nav class="tabs" aria-label="Dashboard sections"><button class="tab active" data-tab="devices">Devices</button><button class="tab" data-tab="server">Server health</button><button class="tab" data-tab="events">Audit events</button><button class="tab" data-tab="backups">Backups</button></nav>
+<section id="panel-devices" class="panel"><div class="panel-head"><div><h2>Registered devices</h2><p class="muted">A PC appears here after a SelectOS device agent enrolls and sends heartbeats.</p></div></div><div class="table-wrap"><table><thead><tr><th>Device</th><th>Address</th><th>Platform</th><th>CPU / RAM / Disk</th><th>Last seen</th><th>State</th><th>Action</th></tr></thead><tbody id="devices"><tr><td colspan="7" class="empty">No device data yet.</td></tr></tbody></table></div></section>
+<section id="panel-server" class="panel hidden"><h2>Server health</h2><div id="server-health" class="detail-grid"></div><p class="note">Metrics are read from the Debian host's /proc and filesystem. CPU percentage is not yet sampled; per-PC metrics require the device agent.</p></section>
+<section id="panel-events" class="panel hidden"><h2>Recent audit events</h2><div class="table-wrap"><table><thead><tr><th>Time</th><th>Actor / device</th><th>Event</th><th>Source IP</th></tr></thead><tbody id="events"><tr><td colspan="4" class="empty">No events.</td></tr></tbody></table></div></section>
+<section id="panel-backups" class="panel hidden"><h2>Database backups</h2><p class="muted">Backups are created by the host-side backup script. Restore is intentionally a manual, operator-confirmed operation.</p><div id="backup-status" class="note">Loading backup status…</div><div class="table-wrap"><table><thead><tr><th>Backup file</th><th>Size</th><th>Created</th></tr></thead><tbody id="backups"><tr><td colspan="3" class="empty">No backup files found.</td></tr></tbody></table></div><pre class="command">cd auth/server && bash scripts/backup.sh</pre></section>
+</section>
+</main>
+<footer>SELECTOS · LAN MANAGEMENT · Boot and OS selection do not depend on this dashboard.</footer>
+<script src="/dashboard/app.js" defer></script>
+</body></html>
