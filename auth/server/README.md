@@ -42,7 +42,7 @@ For a temporary isolated-LAN test only, set SELECTOS_BIND_IP to the server's LAN
 
 Build and install the Linux agent from auth/agent. Follow [the agent guide](../agent/README.md). Configure its server URL, unique device ID, and the same SELECTOS_DEVICE_ENROLLMENT_TOKEN configured on the server. The agent enrolls once and saves its unique device token in a mode-0600 state file. It sends heartbeats every 30 seconds; the dashboard considers a device online for two minutes after its last heartbeat.
 
-The current agent reports hostname, platform, version, memory and disk use. CPU sampling and Windows/macOS agents are not implemented. Revoking a device invalidates its credential; re-enrollment is needed to restore reporting.
+The current agent reports hostname, platform, version, CPU, memory and disk use. Windows/macOS agents are not implemented. Revoking a device invalidates its credential; re-enrollment is needed to restore reporting.
 
 ## Backups
 
