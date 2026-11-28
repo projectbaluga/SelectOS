@@ -10,7 +10,6 @@ static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
 static UINTN TestFsHandleCount;
-static EFI_STATUS TestLocateStatus;
 static VOID WriteTestDiagnostics(EFI_HANDLE ImageHandle) {
     EFI_LOADED_IMAGE *Loaded = NULL;
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
@@ -169,11 +168,9 @@ static VOID ScanFilesystems(VOID) {
     EntryCount = 0;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     TestFsHandleCount = 0;
-    TestLocateStatus = EFI_SUCCESS;
 #endif
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    TestLocateStatus = Status;
     TestFsHandleCount = HandleCount;
 #endif
     if (EFI_ERROR(Status) || Handles == NULL) return;
