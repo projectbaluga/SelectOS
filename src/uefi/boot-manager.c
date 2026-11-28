@@ -173,13 +173,7 @@ static VOID ScanFilesystems(VOID) {
     UINTN HandleCount = 0, i, j;
     EFI_STATUS Status;
     EntryCount = 0;
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    TestFsHandleCount = 0;
-#endif
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    TestFsHandleCount = HandleCount;
-#endif
     if (EFI_ERROR(Status) || Handles == NULL) return;
     for (i = 0; i < HandleCount && EntryCount < MAX_BOOT_ENTRIES; ++i) {
         EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs = NULL;
