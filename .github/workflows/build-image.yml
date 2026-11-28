@@ -95,7 +95,7 @@ jobs:
           test -s dist/native/SelectOS-native-experimental.img
           grep -q '^PRODUCTION_READY=false$' dist/native/IMAGE-BUILD-INFO.txt
           grep -q '^RUNTIME=native-initramfs-bringup$' dist/native/IMAGE-BUILD-INFO.txt
-          (cd dist/native && sha256sum --check IMAGE-SHA256SUMS)
+          sha256sum --check dist/native/IMAGE-SHA256SUMS
 
       - name: Build explicitly marked legacy compatibility image
         env:
