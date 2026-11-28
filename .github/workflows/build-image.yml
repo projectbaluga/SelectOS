@@ -163,7 +163,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \\
+          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
             --jq '.workflow_runs[] | select(.status == "completed") | .id' |
           while IFS= read -r run_id; do
             [[ -n "$run_id" ]] || continue
