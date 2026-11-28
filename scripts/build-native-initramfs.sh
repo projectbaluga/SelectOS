@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$ROOT/src/native-initramfs"
 OUT="$ROOT/dist/native"
 WORK="$(mktemp -d)"
@@ -21,14 +21,14 @@ if ! file "$BUSYBOX" 2>/dev/null | grep -q 'statically linked'; then
 fi
 mkdir -p "$WORK/root/bin" "$WORK/root/dev" "$WORK/root/proc" "$WORK/root/sys" "$WORK/root/run" "$WORK/root/tmp" "$WORK/root/mnt" "$OUT"
 install -m 0755 "$BUSYBOX" "$WORK/root/bin/busybox"
-ln -s busybox "$WORK/root/bin/sh"
-install -m 0755 "$SRC/init" "$WORK/root/init"
-for applet in sh mount mkdir mdev clear cat sleep; do
+for applet in sh mount mkdir mdev clear cat sleep basename; do
   "$WORK/root/bin/busybox" --list | grep -qx "$applet" || {
     echo "ERROR: BusyBox is missing required applet: $applet" >&2
     exit 1
   }
+  ln -s busybox "$WORK/root/bin/$applet"
 done
+install -m 0755 "$SRC/init" "$WORK/root/init"
 (
   cd "$WORK/root"
   find . -print0 | sort -z | cpio --null -o --format=newc --owner=0:0 2>"$WORK/cpio.log" | gzip -n -9 > "$OUT/select-native.img"
