@@ -171,6 +171,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
     UINTN i = 0, j = 0;
     BOOLEAN OwnsCurrent = FALSE;
     if (Root == NULL || Path == NULL) return NULL;
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_ENTRY\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
 
     /* Walk one component at a time. This avoids firmware-specific differences
      * in how root handles parse multi-component absolute/relative paths.
@@ -188,6 +191,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
             Component[j++] = Path[i++];
         }
         if (j == 0) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+            if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_EMPTY_COMPONENT\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
             if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
             return NULL;
         }
@@ -196,6 +202,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
         {
             EFI_STATUS OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next, Component,
                                                        EFI_FILE_MODE_READ, 0);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+            if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_OPEN_RETURNED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
             if (EFI_ERROR(OpenStatus) || Next == NULL) {
                 ConsoleWriteString(L"SELECTOS_COMPONENT_OPEN_FAILED: ");
@@ -215,6 +224,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
         OwnsCurrent = TRUE;
         while (Path[i] == L'\\' || Path[i] == L'/') ++i;
         if (Path[i] == 0) return Current;
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_FINAL_OPENED\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
     }
 }
 static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
