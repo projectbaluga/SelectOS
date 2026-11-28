@@ -221,6 +221,10 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
         }
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (Loader == &KnownLoaders[2]) {
+            if (Component == C_EFI) { CHAR16 M[] = L"SELECTOS_COMPONENT_POINTER_MATCH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            if (Component[0] == (CHAR16)0x005c) { CHAR16 M[] = L"SELECTOS_COMPONENT_FIRST_BACKSLASH\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            if (Component[1] == (CHAR16)0x0045) { CHAR16 M[] = L"SELECTOS_COMPONENT_SECOND_E\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+            if (Component[4] == 0) { CHAR16 M[] = L"SELECTOS_COMPONENT_TERMINATED_AT_4\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             if (i == 0) { CHAR16 M[] = L"SELECTOS_COMPONENT_EFI\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             else if (i == 1) { CHAR16 M[] = L"SELECTOS_COMPONENT_UBUNTU\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
             else if (i == 2) { CHAR16 M[] = L"SELECTOS_COMPONENT_GRUB\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
