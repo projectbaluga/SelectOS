@@ -14,8 +14,8 @@ The build expects these source inputs to be staged in the repository:
 - `config/select.json`
 - `dist/native/select-native.img`, produced by `scripts/build-native-initramfs.sh`
 
-The native initramfs build requires static BusyBox with the `blkid` applet,
-cpio, gzip, coreutils, and file. The image packaging step additionally
+The native initramfs build requires static BusyBox, util-linux `blkid`,
+`ldd`/`awk` for bundling its runtime libraries, cpio, gzip, coreutils, and file. The image packaging step additionally
 requires parted, dosfstools, util-linux, and root privileges. The booted kernel
 must support the target disk controller and FAT/VFAT filesystems; unsupported
 hardware or filesystems are skipped without writes.
@@ -40,8 +40,7 @@ repository's `dist` directory or the legacy `dist/SelectOS.img`.
 
 ## Phase 2 behavior
 
-At native PID 1 startup, SelectOS enumerates partition nodes in sysfs, asks
-BusyBox `blkid` for the GPT partition type, and considers only the standard EFI
+At native PID 1 startup, SelectOS enumerates partition nodes in sysfs, uses the bundled util-linux `blkid` binary for the GPT partition type, and considers only the standard EFI
 System Partition GUID. It mounts each candidate temporarily with
 `ro,nosuid,nodev,noexec`, checks a fixed allowlist of common Windows/Linux EFI
 loader paths, and unmounts it immediately. It does not repair, format, or write

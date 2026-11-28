@@ -5,7 +5,7 @@ SRC="$ROOT/src/native-initramfs"
 OUT="$ROOT/dist/native"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-for cmd in busybox cpio gzip sha256sum file find sort install grep mknod; do
+for cmd in busybox cpio gzip sha256sum file find sort install grep mknod blkid ldd awk; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "ERROR: Missing build dependency: $cmd" >&2
     echo "Debian/Ubuntu: sudo apt-get install busybox-static cpio gzip coreutils file" >&2
@@ -24,13 +24,27 @@ mknod -m 0600 "$WORK/root/dev/console" c 5 1
 mknod -m 0666 "$WORK/root/dev/null" c 1 3
 mknod -m 0666 "$WORK/root/dev/tty" c 5 0
 install -m 0755 "$BUSYBOX" "$WORK/root/bin/busybox"
-for applet in sh mount umount mkdir rmdir mdev clear cat sleep basename blkid tr wc sed rm; do
+for applet in sh mount umount mkdir rmdir mdev clear cat sleep basename tr wc sed rm; do
   "$WORK/root/bin/busybox" --list | grep -qx "$applet" || {
     echo "ERROR: BusyBox is missing required applet: $applet" >&2
     exit 1
   }
   ln -s busybox "$WORK/root/bin/$applet"
 done
+BLKID_BIN="$(command -v blkid)"
+ldd "$BLKID_BIN" > "$WORK/blkid.ldd"
+if grep -q "not found" "$WORK/blkid.ldd"; then
+  echo "ERROR: blkid has unresolved shared-library dependencies." >&2
+  cat "$WORK/blkid.ldd" >&2
+  exit 1
+fi
+# Bundle the real util-linux blkid and its exact runtime libraries. BusyBox
+# does not ship the blkid applet in the Ubuntu static build used by CI.
+while IFS= read -r library; do
+  [[ -n "$library" && -f "$library" ]] || continue
+  install -D -m 0755 "$library" "$WORK/root$library"
+done < <(awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^\\//) { print $i; break } }' "$WORK/blkid.ldd")
+install -m 0755 "$BLKID_BIN" "$WORK/root/sbin/blkid"
 install -m 0755 "$SRC/init" "$WORK/root/init"
 install -m 0755 "$SRC/efi-menu" "$WORK/root/sbin/selectos-efi-menu"
 (
