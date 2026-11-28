@@ -1,12 +1,98 @@
 #include <efi.h>
 #include <efilib.h>
 #include <efiprot.h>
+#include <stdarg.h>
 #define MAX_BOOT_ENTRIES 64
 #define EFI_SIMPLE_FS_GUID { 0x964e5b22, 0x6459, 0x11d2, { 0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b } }
 static EFI_GUID SimpleFsGuid = EFI_SIMPLE_FS_GUID;
 typedef struct { EFI_HANDLE Device; const CHAR16 *Path; const CHAR16 *Label; } BOOT_ENTRY;
 static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
+static UINTN ConsoleWriteString(const CHAR16 *Text) {
+    UINTN Count = 0;
+    if (Text == NULL || ST == NULL || ST->ConOut == NULL) return 0;
+    while (Text[Count] != 0) ++Count;
+    uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, (CHAR16 *)Text);
+    return Count;
+}
+static VOID ConsoleWriteChar(CHAR16 Character) {
+    CHAR16 Text[2];
+    Text[0] = Character;
+    Text[1] = 0;
+    if (ST != NULL && ST->ConOut != NULL)
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Text);
+}
+static UINTN ConsoleWriteNumber(UINTN Value) {
+    CHAR16 Digits[24];
+    UINTN Count = 0, i;
+    if (Value == 0) {
+        ConsoleWriteChar(L'0');
+        return 1;
+    }
+    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0])) {
+        Digits[Count++] = (CHAR16)(L'0' + (Value % 10));
+        Value /= 10;
+    }
+    for (i = Count; i > 0; --i) ConsoleWriteChar(Digits[i - 1]);
+    return Count;
+}
+static UINTN ConsoleWriteHex(UINTN Value) {
+    static const CHAR16 Hex[] = L"0123456789ABCDEF";
+    CHAR16 Digits[2 * sizeof(UINTN)];
+    UINTN Count = 0, i;
+    ConsoleWriteString(L"0x");
+    do {
+        Digits[Count++] = Hex[Value & 0x0f];
+        Value >>= 4;
+    } while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
+    for (i = Count; i > 0; --i) ConsoleWriteChar(Digits[i - 1]);
+    return Count + 2;
+}
+/* Minimal local formatter: avoid GNU-EFI Print/CatPrint library code, which
+ * may contain instructions newer than the baseline x86-64 ISA.
+ */
+static UINTN LocalPrint(const CHAR16 *Format, ...) {
+    va_list Args;
+    UINTN Count = 0, i;
+    va_start(Args, Format);
+    for (i = 0; Format != NULL && Format[i] != 0; ++i) {
+        if (Format[i] != L'%') {
+            ConsoleWriteChar(Format[i]);
+            ++Count;
+            continue;
+        }
+        ++i;
+        if (Format[i] == 0) break;
+        switch (Format[i]) {
+            case L's': {
+                const CHAR16 *Text = va_arg(Args, const CHAR16 *);
+                Count += ConsoleWriteString(Text);
+                break;
+            }
+            case L'u':
+                Count += ConsoleWriteNumber(va_arg(Args, UINTN));
+                break;
+            case L'c':
+                ConsoleWriteChar((CHAR16)va_arg(Args, int));
+                ++Count;
+                break;
+            case L'r':
+                Count += ConsoleWriteHex((UINTN)va_arg(Args, EFI_STATUS));
+                break;
+            case L'%':
+                ConsoleWriteChar(L'%');
+                ++Count;
+                break;
+            default:
+                ConsoleWriteChar(L'%');
+                ConsoleWriteChar(Format[i]);
+                Count += 2;
+                break;
+        }
+    }
+    va_end(Args);
+    return Count;
+}
 static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] = {
     { L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", L"Windows Boot Manager" },
     { L"\\EFI\\ubuntu\\shimx64.efi", L"Ubuntu (shim)" },
@@ -63,7 +149,7 @@ static UINTN ReadSelection(VOID) {
     EFI_INPUT_KEY Key;
     UINTN Value = 0;
     BOOLEAN HasDigits = FALSE;
-    Print(L"\r\nEnter entry number, or q to return to GRUB: ");
+    LocalPrint(L"\r\nEnter entry number, or q to return to GRUB: ");
     for (;;) {
         EFI_STATUS Status;
         do {
@@ -78,10 +164,10 @@ static UINTN ReadSelection(VOID) {
             if (Value > 999) continue;
             Value = Value * 10 + Digit;
             HasDigits = TRUE;
-            Print(L"%c", Key.UnicodeChar);
+            LocalPrint(L"%c", Key.UnicodeChar);
         } else if (Key.UnicodeChar == L'\b' && HasDigits) {
             Value /= 10;
-            Print(L"\b \b");
+            LocalPrint(L"\b \b");
         }
     }
 }
@@ -163,10 +249,10 @@ static EFI_STATUS LaunchEntry(EFI_HANDLE ImageHandle, const BOOT_ENTRY *Entry) {
     Status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, ImageHandle, DevicePath, NULL, 0, &ChildImage);
     uefi_call_wrapper(BS->FreePool, 1, DevicePath);
     if (EFI_ERROR(Status)) return Status;
-    Print(L"\r\nStarting %s...\r\n", Entry->Label);
+    LocalPrint(L"\r\nStarting %s...\r\n", Entry->Label);
     Status = uefi_call_wrapper(BS->StartImage, 3, ChildImage, &ExitDataSize, &ExitData);
     if (ExitData != NULL) {
-        Print(L"Loader returned: %s\r\n", ExitData);
+        LocalPrint(L"Loader returned: %s\r\n", ExitData);
         uefi_call_wrapper(BS->FreePool, 1, ExitData);
     }
     uefi_call_wrapper(BS->UnloadImage, 1, ChildImage);
@@ -178,39 +264,39 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         UINTN i, Selection;
         EFI_STATUS Status;
         uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
-        Print(L"SelectOS UEFI Boot Manager — experimental\r\n");
-        Print(L"===========================================\r\n\r\n");
-        Print(L"Scanning UEFI-readable filesystem volumes...\r\n");
+        LocalPrint(L"SelectOS UEFI Boot Manager — experimental\r\n");
+        LocalPrint(L"===========================================\r\n\r\n");
+        LocalPrint(L"Scanning UEFI-readable filesystem volumes...\r\n");
         ScanFilesystems();
         if (EntryCount == 0) {
-            Print(L"\r\nNo supported EFI loader was found.\r\n");
-            Print(L"No firmware boot variable or disk content was changed.\r\n");
-            Print(L"\r\nPress any key to return to GRUB.\r\n");
+            LocalPrint(L"\r\nNo supported EFI loader was found.\r\n");
+            LocalPrint(L"No firmware boot variable or disk content was changed.\r\n");
+            LocalPrint(L"\r\nPress any key to return to GRUB.\r\n");
             PauseForKey();
             return EFI_NOT_FOUND;
         }
-        Print(L"\r\nAvailable operating-system loaders:\r\n");
+        LocalPrint(L"\r\nAvailable operating-system loaders:\r\n");
         for (i = 0; i < EntryCount; ++i)
-            Print(L"  %u) %s — %s\r\n", (UINTN)(i + 1), Entries[i].Label, Entries[i].Path);
-        Print(L"\r\nFirmware Secure Boot policy remains in force.\r\n");
-        Print(L"SelectOS does not bypass image signature checks.\r\n");
+            LocalPrint(L"  %u) %s — %s\r\n", (UINTN)(i + 1), Entries[i].Label, Entries[i].Path);
+        LocalPrint(L"\r\nFirmware Secure Boot policy remains in force.\r\n");
+        LocalPrint(L"SelectOS does not bypass image signature checks.\r\n");
         Selection = ReadSelection();
         if (Selection == 0) return EFI_SUCCESS;
         if (Selection > EntryCount) {
-            Print(L"\r\nInvalid selection. Press any key to retry.\r\n");
+            LocalPrint(L"\r\nInvalid selection. Press any key to retry.\r\n");
             PauseForKey();
             continue;
         }
         Status = LaunchEntry(ImageHandle, &Entries[Selection - 1]);
         if (Status == EFI_SECURITY_VIOLATION) {
-            Print(L"\r\nFirmware rejected this loader under its security policy.\r\n");
-            Print(L"Use a trusted signed loader; Secure Boot was not changed.\r\n");
+            LocalPrint(L"\r\nFirmware rejected this loader under its security policy.\r\n");
+            LocalPrint(L"Use a trusted signed loader; Secure Boot was not changed.\r\n");
         } else if (EFI_ERROR(Status)) {
-            Print(L"\r\nCould not start the selected loader: %r\r\n", Status);
+            LocalPrint(L"\r\nCould not start the selected loader: %r\r\n", Status);
         } else {
-            Print(L"\r\nThe selected loader returned control to SelectOS.\r\n");
+            LocalPrint(L"\r\nThe selected loader returned control to SelectOS.\r\n");
         }
-        Print(L"Press any key to return to the menu.\r\n");
+        LocalPrint(L"Press any key to return to the menu.\r\n");
         PauseForKey();
     }
 }
