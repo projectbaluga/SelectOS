@@ -21,7 +21,7 @@ esac
 MOCK
 cat > "$TMP/bin/mount" <<'MOCK'
 #!/bin/sh
-target="\${@: -1}"
+target="${@: -1}"
 mkdir -p "$target/EFI/Microsoft/Boot"
 : > "$target/EFI/Microsoft/Boot/bootmgfw.efi"
 MOCK
@@ -57,10 +57,11 @@ sed \
   -e "s|/bin/console|$TMP/console/input|g" \
   "$MENU" > "$TMP/menu-test"
 chmod +x "$TMP/menu-test"
-output="$(PATH="$TMP/bin:$PATH" SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" bash "$TMP/menu-test")"
+output="$(PATH="$TMP/bin:$PATH" SELECTOS_SYS_BLOCK="$TMP/sys" SELECTOS_DEV_ROOT="$TMP/dev" SELECTOS_MOUNT_ROOT="$TMP/mount-root" SELECTOS_CONSOLE="$TMP/console/input" SELECTOS_TEST_MOUNT_LOG="$TMP/mount.log" bash "$TMP/menu-test")"
 grep -q 'Windows' <<< "$output"
 grep -q 'Napili:' <<< "$output"
 grep -q 'Hindi pa available ang UEFI handoff' <<< "$output"
+grep -q 'ro,nosuid,nodev,noexec' "$TMP/mount.log"
 # Ensure the source contains no executable chainload/firmware-write operation.
 if grep -Eiq 'BootNext|efivarfs|chainload|(^|[[:space:]])(exec|chroot)[[:space:]]' "$MENU"; then
   echo "Unexpected firmware write or execution path in EFI menu." >&2
