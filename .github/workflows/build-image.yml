@@ -60,10 +60,11 @@ jobs:
           [[ -b "$PART" ]] || { echo "::error::Could not find source image partition $PART"; exit 1; }
           sudo mount -o ro "$PART" "$WORK/source"
           mkdir -p boot EFI/BOOT
-          for file in BOOT/VMLINUZ EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do
+          for file in BOOT/VMLINUZ BOOT/GATE.IMG EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do
             sudo test -s "$WORK/source/$file"
           done
           sudo cp "$WORK/source/BOOT/VMLINUZ" boot/vmlinuz
+          sudo cp "$WORK/source/BOOT/GATE.IMG" boot/select.img
           sudo cp "$WORK/source/EFI/BOOT/BOOTX64.EFI" EFI/BOOT/BOOTX64.EFI
           sudo cp "$WORK/source/EFI/BOOT/GRUBX64.EFI" EFI/BOOT/grubx64.efi
           sudo cp "$WORK/source/EFI/BOOT/MMX64.EFI" EFI/BOOT/mmx64.efi
