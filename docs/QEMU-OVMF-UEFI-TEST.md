@@ -27,8 +27,17 @@ NVRAM. The production native image remains marked `PRODUCTION_READY=false`.
 
 The QEMU harness compiles the boot manager with
 `SELECTOS_QEMU_TEST_DIAGNOSTICS`. This test-only build writes
-`selectos-debug.log` to the disposable ESP, recording that the manager
-started and how many UEFI Simple File System handles and supported loader
-entries it discovered. The normal image build does not define this macro and
+`selectos-debug.log` to the disposable ESP, recording that the manager started and how many UEFI Simple File System
+handles and supported loader entries it discovered. The test build also emits
+a console marker at the first line of efi_main, before GNU-EFI library
+initialization, to distinguish entrypoint execution from a failure during
+initialization. Diagnostic files are attempted on every discovered Simple File
+System volume rather than assuming the image's LoadedImage->DeviceHandle is
+the writable volume. The normal image build does not define this macro and
 does not write this diagnostic file. When the child marker is missing, the
 test prints the diagnostic log if the manager was able to create it.
+
+
+### Current debugging observation
+
+The latest completed attempt confirms that GRUB reads the SelectOS EFI file from the expected (hd0) path and accepts the chainloader command. The subsequent boot operation still fails before the child handoff marker is created. This narrows the remaining issue to EFI image execution/entrypoint or initialization; it is not evidence of a successful UEFI handoff. The test now prints PE/COFF headers and section information and checks for an entrypoint console marker and per-volume diagnostic log.
