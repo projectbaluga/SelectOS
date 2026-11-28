@@ -69,8 +69,9 @@ cmd = [
     "-drive", f"if=pflash,format=raw,file={variables}",
     "-display", "none", "-serial", "none",
     "-monitor", "none", "-qmp", f"unix:{qmp_path},server=on,wait=off",
+    "-device", "qemu-xhci,id=xhci",
     "-drive", f"if=none,id=stick,format=raw,file={image}",
-    "-device", "usb-storage,drive=stick,bootindex=1",
+    "-device", "usb-storage,drive=stick,bus=xhci.0,bootindex=1",
     "-no-reboot", "-no-shutdown",
 ]
 proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -80,9 +81,7 @@ try:
     deadline = time.time() + 20
     while time.time() < deadline:
         if proc.poll() is not None:
-            _, stderr = proc.communicate()
-            detail = stderr.decode(errors="replace") if stderr else "(no stderr)"
-            raise RuntimeError(f"QEMU exited before QMP became ready: {detail}")
+            raise RuntimeError("QEMU exited before QMP became ready")
         try:
             sock.connect(qmp_path)
             break
