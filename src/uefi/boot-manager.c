@@ -20,7 +20,6 @@ static VOID WriteTestDiagnostics(VOID) {
     const CHAR8 EntriesText[] = "\nENTRIES=";
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid,
                                NULL, &HandleCount, &Handles);
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     for (i = 0; i + 1 < sizeof(Prefix); ++i) Buffer[Length++] = Prefix[i];
     for (i = 0; i + 1 < sizeof(Scan); ++i) Buffer[Length++] = Scan[i];
     {
