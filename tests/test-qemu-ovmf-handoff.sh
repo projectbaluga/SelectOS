@@ -5,7 +5,7 @@ WORK="$(mktemp -d)"
 cleanup() { rm -rf -- "$WORK"; }
 trap cleanup EXIT
 
-for cmd in gcc ld objcopy qemu-system-x86_64 parted mformat mmd mcopy mtype python3 timeout; do
+for cmd in gcc ld objcopy qemu-system-x86_64 mformat mmd mcopy mtype python3 timeout; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "ERROR: Missing QEMU/OVMF test dependency: $cmd" >&2
     exit 1
