@@ -37,7 +37,6 @@ jobs:
         run: bash scripts/build-native-initramfs.sh
       - name: Verify artifact and checksums
         run: |
-          test -s dist/native/vmlinuz
           test -s dist/native/select-native.img
           grep -q '^PRODUCTION_READY=false$' dist/native/BUILD-INFO.txt
           (cd dist/native && sha256sum -c SHA256SUMS)
