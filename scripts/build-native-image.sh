@@ -11,7 +11,7 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST="${ROOT}/dist/native"
 OUT="${SELECTOS_NATIVE_IMAGE_OUT:-${DIST}/SelectOS-native-experimental.img}"
-TMP_OUT="${OUT}.tmp.$"
+TMP_OUT="${OUT}.tmp.${BASHPID}"
 SIZE_MB="${SELECTOS_NATIVE_IMAGE_SIZE_MB:-512}"
 LABEL="SELECTOS"
 MNT=""
@@ -32,7 +32,7 @@ for f in "${required[@]}"; do
   [[ -s "$f" ]] || { echo "ERROR: Required input missing or empty: $f" >&2; exit 1; }
 done
 
-for cmd in dd parted losetup mkfs.vfat mount umount sync file install sleep mv; do
+for cmd in dd parted losetup mkfs.vfat mount umount sync file install sleep mv rm cp mkdir rmdir touch; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: Missing build dependency: $cmd" >&2; exit 1; }
 done
 [[ "$SIZE_MB" =~ ^[0-9]+$ ]] && (( SIZE_MB >= 128 )) || {
