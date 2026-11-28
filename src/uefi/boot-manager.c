@@ -195,10 +195,22 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
         }
         Component[j] = 0;
         Next = NULL;
-        if (EFI_ERROR(uefi_call_wrapper(Current->Open, 5, Current, &Next, Component,
-                                        EFI_FILE_MODE_READ, 0)) || Next == NULL) {
-            if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
-            return NULL;
+        {
+            EFI_STATUS OpenStatus = uefi_call_wrapper(Current->Open, 5, Current, &Next, Component,
+                                                       EFI_FILE_MODE_READ, 0);
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+            if (EFI_ERROR(OpenStatus) || Next == NULL) {
+                ConsoleWriteString(L"SELECTOS_COMPONENT_OPEN_FAILED: ");
+                ConsoleWriteString(Component);
+                ConsoleWriteString(L" status=");
+                ConsoleWriteHex((UINTN)OpenStatus);
+                ConsoleWriteString(L"\\r\\n");
+            }
+#endif
+            if (EFI_ERROR(OpenStatus) || Next == NULL) {
+                if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
+                return NULL;
+            }
         }
         if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
         Current = Next;
