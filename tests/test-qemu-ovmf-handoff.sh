@@ -38,10 +38,14 @@ LIBDIR="$(dirname "$LDS")"
 
 build_efi() {
   local src="$1" out="$2" name="$3"
+  local extra_flags=()
+  if [[ "$name" == "boot-manager" ]]; then
+    extra_flags+=(-DSELECTOS_QEMU_TEST_DIAGNOSTICS)
+  fi
   gcc -I/usr/include/efi -I/usr/include/efi/x86_64 -I/usr/include/efi/protocol \
     -fpic -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -fno-stack-protector \
     -march=x86-64 -mtune=generic -mno-sse4.1 -mno-sse4.2 -mno-avx -mno-avx2 \
-    -DEFI_FUNCTION_WRAPPER -c "$src" -o "$WORK/$name.o"
+    -DEFI_FUNCTION_WRAPPER "${extra_flags[@]}" -c "$src" -o "$WORK/$name.o"
   ld -nostdlib -znocombreloc -T "$LDS" -shared -Bsymbolic \
     "$CRT" "$WORK/$name.o" -L"$LIBDIR" -lefi -lgnuefi -o "$WORK/$name.so"
   objcopy -j .text -j .sdata -j .data -j .dynamic -j .dynsym \
@@ -160,6 +164,12 @@ PY
 if ! mtype -i "$FAT_IMAGE" ::/handoff.ok > "$WORK/handoff.txt" 2>/dev/null; then
   echo "ERROR: QEMU/OVMF did not create the child-loader handoff marker." >&2
   echo "The firmware boot, menu input, or LoadImage/StartImage path did not complete." >&2
+  if mtype -i "$FAT_IMAGE" ::/selectos-debug.log > "$WORK/manager-debug.txt" 2>/dev/null; then
+    echo "SelectOS test-only filesystem diagnostics:" >&2
+    cat "$WORK/manager-debug.txt" >&2
+  else
+    echo "No SelectOS manager diagnostic file was written; firmware may not have launched BOOTX64.EFI." >&2
+  fi
   exit 1
 fi
 grep -qx 'SELECTOS_QEMU_OVMF_HANDOFF_OK' "$WORK/handoff.txt"
