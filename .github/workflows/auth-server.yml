@@ -11,6 +11,7 @@ on:
     paths:
       - "auth/server/**"
       - "auth/client/**"
+      - "auth/agent/**"
       - ".github/workflows/auth-server.yml"
   workflow_dispatch:
 
