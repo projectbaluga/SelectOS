@@ -15,12 +15,12 @@ grep -q 'SELECTOS_SCAN_RETURNED' "$SRC"
 grep -q 'BuildFileDevicePath' "$SRC"
 grep -q 'OpenPathFromRoot' "$SRC"
 grep -q 'Walk one component at a time' "$SRC"
-# Regression checks: EFI path separators are compared as explicit UTF-16 code units,
-# and diagnostics emit CRLF rather than literal backslash-r/backslash-n text.
-grep -Fq 'Path[i] == (CHAR16)0x005c' "$SRC"
-grep -Fq 'Path[i] != 0 && Path[i] != (CHAR16)0x005c' "$SRC"
-grep -Fq 'Path[i] == (CHAR16)0x002f' "$SRC"
-grep -Fq 'L"/EFI/ubuntu/grubx64.efi"' "$SRC"
+# Regression checks: loader traversal uses explicit CHAR16 component arrays,
+# avoiding compiler wchar_t layout and path-separator parsing assumptions.
+grep -q 'ComponentCount' "$SRC"
+grep -q 'C_GRUBX64' "$SRC"
+grep -q 'C_EFI' "$SRC"
+grep -q 'L"/EFI/ubuntu/grubx64.efi"' "$SRC"
 grep -Fq 'ConsoleWriteString(L"\r\n");' "$SRC"
 grep -Fq 'SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n' "$SRC"
 grep -q 'LocalPrint' "$SRC"
