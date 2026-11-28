@@ -231,10 +231,16 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const KNOWN_LOADER
             ++k;
         }
         if (Component[k] != 0) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+            if (Loader == &KnownLoaders[2]) { CHAR16 M[] = L"SELECTOS_COMPONENT_COPY_TOO_LONG\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
             if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
             return NULL;
         }
         FileName[k] = 0;
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        if (Loader == &KnownLoaders[2]) { CHAR16 M[] = L"SELECTOS_COMPONENT_COPY_READY\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
         OpenStatus = uefi_call_wrapper(Root->Open, 5, Root, &Next,
                                        FileName, (UINT64)EFI_FILE_MODE_READ, (UINT64)0);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
