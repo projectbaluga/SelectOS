@@ -317,18 +317,36 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 #endif
     InitializeLib(ImageHandle, SystemTable);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+    {
+        CHAR16 Marker[] = L"SELECTOS_MANAGER_INITIALIZED\\r\\n";
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+    }
     WriteTestDiagnostics();
+    {
+        CHAR16 Marker[] = L"SELECTOS_DIAGNOSTICS_RETURNED\\r\\n";
+        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+    }
 #endif
     for (;;) {
         UINTN i, Selection;
         EFI_STATUS Status;
+#ifndef SELECTOS_QEMU_TEST_DIAGNOSTICS
         uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+#endif
         LocalPrint(L"SelectOS UEFI Boot Manager — experimental\r\n");
         LocalPrint(L"===========================================\r\n\r\n");
         LocalPrint(L"Scanning UEFI-readable filesystem volumes...\r\n");
         ScanFilesystems();
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+        {
+            CHAR16 Marker[] = L"SELECTOS_SCAN_RETURNED\\r\\n";
+            uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+        }
         WriteTestDiagnostics();
+        {
+            CHAR16 Marker[] = L"SELECTOS_POSTSCAN_DIAGNOSTICS_RETURNED\\r\\n";
+            uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
+        }
 #endif
         if (EntryCount == 0) {
             LocalPrint(L"\r\nNo supported EFI loader was found.\r\n");
