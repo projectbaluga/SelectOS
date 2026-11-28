@@ -135,7 +135,7 @@ func (u *UI) footer() {
 }
 
 func (u *UI) privacy() {
-	u.c.TextC(u.fS, u.c.W/2, u.c.H-u.sc(84), "Sessions are logged for lab accountability (Data Privacy Act of 2012).", 1, cDim)
+	u.c.TextC(u.fS, u.c.W/2, u.c.H-u.sc(84), "Username is a local session label; this screen does not authenticate accounts.", 1, cDim)
 }
 
 func (u *UI) keycap(x, y int, label string) int {
@@ -209,7 +209,7 @@ func (u *UI) drawLogin(local, errMsg string, caret bool) {
 	c := u.c
 	c.reset()
 	u.brand()
-	const subtitle = "Sign in with your Gbox account to start."
+	const subtitle = "Enter your Gbox username to continue."
 	pad := u.sc(52)
 	cw, ch := u.sc(660), u.sc(470)
 	if need := u.fM.width(subtitle, 1) + 2*pad + u.sc(16); cw < need {
@@ -227,7 +227,7 @@ func (u *UI) drawLogin(local, errMsg string, caret bool) {
 	y += u.fL.H*u.ts + u.sc(10)
 	c.Text(u.fM, x0+pad, y, subtitle, 1, cMuted)
 	y += u.fM.H + u.sc(34)
-	c.Text(u.fS, x0+pad, y, "GBOX EMAIL", 1, cDim)
+	c.Text(u.fS, x0+pad, y, "GBOX USERNAME", 1, cDim)
 	y += u.fS.H + u.sc(10)
 
 	iw, ih := cw-2*pad, u.sc(72)
@@ -318,7 +318,7 @@ func (u *UI) drawPicker(local string, items []osItem, sel int) {
 			c.TextC(u.fS, x+cw/2, sy+chh-u.sc(44), "Press Enter to start", 1, cAccent)
 		}
 	}
-	u.hints([][2]string{{"<", "previous"}, {">", "next"}, {"Enter", "start"}, {"Esc", "sign out"}})
+	u.hints([][2]string{{"<", "previous"}, {">", "next"}, {"Enter", "start"}, {"Esc", "back"}})
 	u.footer()
 }
 
