@@ -5,7 +5,9 @@ on:
     paths:
       - "src/native-initramfs/**"
       - "scripts/build-native-initramfs.sh"
+      - "scripts/discover-efi-entries.py"
       - "tests/test-native-init.sh"
+      - "tests/test-efi-discovery.py"
       - "docs/NATIVE-RUNTIME-STATUS.md"
       - "docs/CONTROL-CENTER-CONNECT.md"
       - "auth/agent/**"
@@ -16,7 +18,9 @@ on:
     paths:
       - "src/native-initramfs/**"
       - "scripts/build-native-initramfs.sh"
+      - "scripts/discover-efi-entries.py"
       - "tests/test-native-init.sh"
+      - "tests/test-efi-discovery.py"
       - "auth/agent/**"
       - ".github/workflows/native-runtime.yml"
 
@@ -39,6 +43,8 @@ jobs:
           sudo apt-get install -y busybox-static cpio gzip coreutils file
       - name: Check shell syntax and boot-path isolation
         run: bash tests/test-native-init.sh
+      - name: Test read-only EFI discovery prototype
+        run: python3 tests/test-efi-discovery.py
       - name: Build experimental initramfs
         run: bash scripts/build-native-initramfs.sh
       - name: Verify artifact and checksums
