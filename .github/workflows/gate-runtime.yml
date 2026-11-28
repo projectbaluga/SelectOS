@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+      - name: Check build script syntax
+        run: bash -n src/gate-runtime/tools/build-image.sh
       - name: Vet and test
         working-directory: src/gate-runtime
         run: |
