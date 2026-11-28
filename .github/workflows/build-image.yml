@@ -1,4 +1,4 @@
-name: Build legacy-compatible SelectOS image
+name: Build SelectOS images
 
 on:
   pull_request:
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   build:
-    name: Build legacy Gate runtime image (login remains)
+    name: Build legacy and experimental native images
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,7 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y parted dosfstools util-linux gzip cpio busybox-static coreutils file
 
-      - name: Extract legacy boot files
+      - name: Extract kernel and UEFI boot files from compatibility source
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -46,13 +46,13 @@ jobs:
               sudo umount "$WORK/source" 2>/dev/null || true
               sudo losetup -d "$LOOP" 2>/dev/null || true
             fi
-            rm -rf "$WORK"
+            rm -rf -- "$WORK"
           }
           trap cleanup EXIT
           mkdir -p "$WORK/source"
           gzip -dc "$SOURCE" > "$WORK/source.img"
           LOOP="$(sudo losetup --find --show --partscan "$WORK/source.img")"
-          PART="${LOOP}p1"
+          PART="\${LOOP}p1"
           for attempt in {1..10}; do
             [[ -b "$PART" ]] && break
             sleep 1
@@ -60,16 +60,15 @@ jobs:
           [[ -b "$PART" ]] || { echo "::error::Could not find source image partition $PART"; exit 1; }
           sudo mount -o ro "$PART" "$WORK/source"
           mkdir -p boot EFI/BOOT
-          for file in BOOT/VMLINUZ BOOT/GATE.IMG EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do
+          for file in BOOT/VMLINUZ EFI/BOOT/BOOTX64.EFI EFI/BOOT/GRUBX64.EFI EFI/BOOT/MMX64.EFI; do
             sudo test -s "$WORK/source/$file"
           done
           sudo cp "$WORK/source/BOOT/VMLINUZ" boot/vmlinuz
-          sudo cp "$WORK/source/BOOT/GATE.IMG" boot/select.img
           sudo cp "$WORK/source/EFI/BOOT/BOOTX64.EFI" EFI/BOOT/BOOTX64.EFI
           sudo cp "$WORK/source/EFI/BOOT/GRUBX64.EFI" EFI/BOOT/grubx64.efi
           sudo cp "$WORK/source/EFI/BOOT/MMX64.EFI" EFI/BOOT/mmx64.efi
           sudo chown -R "$USER:$USER" boot EFI
-          for file in boot/vmlinuz boot/select.img EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
+          for file in boot/vmlinuz EFI/BOOT/BOOTX64.EFI EFI/BOOT/grubx64.efi EFI/BOOT/mmx64.efi; do
             [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
@@ -89,16 +88,20 @@ jobs:
           SELECTOS_BUILD_NATIVE_EXPERIMENTAL: "1"
         run: sudo --preserve-env=SELECTOS_BUILD_NATIVE_EXPERIMENTAL bash scripts/build-native-image.sh
 
-      - name: Verify native image warning manifest
+      - name: Verify native image manifest and checksum
         run: |
           test -s dist/native/select-native.img
           test -s dist/native/SelectOS-native-experimental.img
-          grep -q '^PRODUCTION_READY=false
+          grep -q '^PRODUCTION_READY=false$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^RUNTIME=native-initramfs-bringup$' dist/native/IMAGE-BUILD-INFO.txt
+          (cd dist/native && sha256sum --check IMAGE-SHA256SUMS)
+
+      - name: Build explicitly marked legacy compatibility image
         env:
           SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
         run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
 
-      - name: Verify image and legacy warning manifest
+      - name: Verify legacy image and warning manifest
         run: |
           test -s dist/SelectOS.img
           grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
@@ -111,12 +114,12 @@ jobs:
           name: SelectOS-native-experimental
           path: |
             dist/native/SelectOS-native-experimental.img
-            dist/native/BUILD-INFO.txt
-            dist/native/SHA256SUMS
+            dist/native/IMAGE-BUILD-INFO.txt
+            dist/native/IMAGE-SHA256SUMS
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload legacy image artifact
+      - name: Upload legacy compatibility image artifact
         uses: actions/upload-artifact@v4
         with:
           name: SelectOS-legacy-Gate-runtime
@@ -131,21 +134,21 @@ jobs:
     needs: build
     # Pull-request runs can come from forks and must not receive an Actions write token.
     # Cleanup runs after manual image builds, even if the build job fails.
-    if: ${{ always() && github.event_name != 'pull_request' }}
+    if: \${{ always() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
       - name: Delete previous completed workflow runs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: \${{ github.repository }}
+          CURRENT_RUN_ID: \${{ github.run_id }}
         shell: bash
         run: |
           set -Eeuo pipefail
           echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
+          gh api --paginate "repos/\${GH_REPO}/actions/runs?per_page=100" \
             --jq '.workflow_runs[] | select(.status == "completed") | .id' |
           while IFS= read -r run_id; do
             [[ -n "$run_id" ]] || continue
@@ -153,110 +156,5 @@ jobs:
               continue
             fi
             echo "Deleting completed workflow run $run_id"
-            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
-          done
- <(strings dist/native/SelectOS-native-experimental.img)
-          grep -q '^RUNTIME=native-initramfs-bringup
-        env:
-          SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
-        run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
-
-      - name: Verify image and legacy warning manifest
-        run: |
-          test -s dist/SelectOS.img
-          grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
-          grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
-          file dist/SelectOS.img
-
-      - name: Upload legacy image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SelectOS-legacy-Gate-runtime
-          path: |
-            dist/SelectOS.img
-            dist/SELECTOS-BUILD-INFO.txt
-          if-no-files-found: error
-          retention-days: 14
-
-  cleanup-finished-runs:
-    name: Clean up completed workflow runs
-    needs: build
-    # Pull-request runs can come from forks and must not receive an Actions write token.
-    # Cleanup runs after manual image builds, even if the build job fails.
-    if: ${{ always() && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Delete previous completed workflow runs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | select(.status == "completed") | .id' |
-          while IFS= read -r run_id; do
-            [[ -n "$run_id" ]] || continue
-            if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then
-              continue
-            fi
-            echo "Deleting completed workflow run $run_id"
-            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
-          done
- <(strings dist/native/SelectOS-native-experimental.img)
-
-      - name: Build explicitly marked legacy image
-        env:
-          SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
-        run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
-
-      - name: Verify image and legacy warning manifest
-        run: |
-          test -s dist/SelectOS.img
-          grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
-          grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
-          file dist/SelectOS.img
-
-      - name: Upload legacy image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SelectOS-legacy-Gate-runtime
-          path: |
-            dist/SelectOS.img
-            dist/SELECTOS-BUILD-INFO.txt
-          if-no-files-found: error
-          retention-days: 14
-
-  cleanup-finished-runs:
-    name: Clean up completed workflow runs
-    needs: build
-    # Pull-request runs can come from forks and must not receive an Actions write token.
-    # Cleanup runs after manual image builds, even if the build job fails.
-    if: ${{ always() && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Delete previous completed workflow runs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | select(.status == "completed") | .id' |
-          while IFS= read -r run_id; do
-            [[ -n "$run_id" ]] || continue
-            if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then
-              continue
-            fi
-            echo "Deleting completed workflow run $run_id"
-            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
+            gh api --method DELETE "repos/\${GH_REPO}/actions/runs/\${run_id}"
           done
