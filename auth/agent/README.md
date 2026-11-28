@@ -20,7 +20,11 @@ Create /etc/selectos-agent.env (root-readable only):
 
 Set the same random enrollment secret on the server as SELECTOS_DEVICE_ENROLLMENT_TOKEN. Use a unique ID per PC. The enrollment secret is needed only for initial registration; afterward the agent uses its unique device token. HTTP is for isolated LAN testing only; production should use HTTPS with a trusted certificate.
 
-Install the systemd unit and run:
+Install the unit file and create the service account, then run:
+
+    sudo useradd --system --home /var/lib/selectos-agent --shell /usr/sbin/nologin selectos-agent
+    sudo chown -R selectos-agent:selectos-agent /var/lib/selectos-agent
+    sudo install -m 0644 selectos-agent.service /etc/systemd/system/selectos-agent.service
 
     sudo chmod 600 /etc/selectos-agent.env
     sudo systemctl daemon-reload
