@@ -3,6 +3,7 @@
 export PATH=/bin:/sbin HOME=/ TERM=linux
 bb() { /bin/busybox "$@"; }
 log() { printf '[SelectOS] %s\n' "$*"; }
+
 bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
 bb mkdir -p /proc /sys /run /dev/pts /tmp /mnt
 bb mount -t proc proc /proc 2>/dev/null || true
@@ -11,13 +12,14 @@ bb mount -t devpts devpts /dev/pts 2>/dev/null || true
 bb mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run 2>/dev/null || true
 bb mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp 2>/dev/null || true
 bb mdev -s 2>/dev/null || true
+
 clear 2>/dev/null || true
 cat <<'BANNER'
   ____       _           _    ___  ____
- / ___|  ___| | ___  ___| |_ / _ \ / ___|
- \___ \ / _ \ |/ _ \/ __| __| | | \___ \
+ / ___|  ___| | ___  ___| |_ / _ \\ / ___|
+ \\___ \\ / _ \\ |/ _ \\/ __| __| | | \\___ \\
   ___) |  __/ |  __/ (__| |_| |_| |___) |
- |____/ \___|_|\___|\___|\__|\___/|____/
+ |____/ \\___|_|\\___|\\___|\\__|\\___/|____/
        Native runtime — experimental
 BANNER
 log "Native PID 1 started."
@@ -27,10 +29,10 @@ log "Detected block devices:"
 found=0
 for node in /sys/class/block/*; do
   [ -e "$node" ] || continue
-  name=\${node##*/}
+  name=$(basename "$node")
   case "$name" in loop*|ram*) continue ;; esac
   size="$(bb cat "$node/size" 2>/dev/null)"
-  printf '  - %s (%s sectors)\n' "$name" "\${size:-unknown}"
+  printf '  - %s (%s sectors)\n' "$name" "${size:-unknown}"
   found=1
 done
 [ "$found" -eq 1 ] || log "No block devices detected yet."
