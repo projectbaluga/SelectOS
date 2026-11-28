@@ -45,6 +45,10 @@ The output is `dist/SelectOS.img`, a 512 MiB FAT32 UEFI image. The explicit opt-
 
 **Do not write a legacy artifact to a production USB expecting the Gbox login to be gone.**
 
+## Server management dashboard
+
+The LAN-only SelectOS Control Center is served by the Debian Go server at `/dashboard`. It includes administrator access, host health metrics, a device registry with per-device enrollment tokens and heartbeat agent, audit events, and PostgreSQL backup inventory/scripts. See [docs/CONTROL-CENTER.md](docs/CONTROL-CENTER.md) for deployment, TLS, enrollment, and recovery instructions. The dashboard is separate from PC boot authentication; it does not add a login requirement to SelectOS boot.
+
 ## No-login runtime implementation
 
 Read [docs/NO-LOGIN-MIGRATION.md](docs/NO-LOGIN-MIGRATION.md) for the required source tree, boot contract, implementation phases, acceptance tests, and the precise reason a new login-free bootable image cannot yet be built from the files currently available.
