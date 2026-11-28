@@ -16,7 +16,7 @@ grep -q 'BuildFileDevicePath' "$SRC"
 grep -q 'OpenPathFromRoot' "$SRC"
 grep -q 'Walk an explicit list of CHAR16 components' "$SRC"
 # Regression checks: loader traversal uses explicit CHAR16 component arrays,
-# avoiding compiler wchar_t layout and path-separator parsing assumptions.
+# avoiding runtime path-separator parsing by using explicit component arrays.
 grep -q 'ComponentCount' "$SRC"
 grep -q 'C_GRUBX64' "$SRC"
 grep -q 'C_EFI' "$SRC"
