@@ -39,7 +39,8 @@ LIBDIR="$(dirname "$LDS")"
 build_efi() {
   local src="$1" out="$2" name="$3"
   gcc -I/usr/include/efi -I/usr/include/efi/x86_64 -I/usr/include/efi/protocol \
-    -fpic -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -fno-stack-protector \
+    -fpic -fshort-wchar -mno-red-zone -maccumulate-outgoing-args -fno-stack-protector \\
+    -march=x86-64 -mtune=generic -mno-sse4.1 -mno-sse4.2 -mno-avx -mno-avx2 \\
     -DEFI_FUNCTION_WRAPPER -c "$src" -o "$WORK/$name.o"
   ld -nostdlib -znocombreloc -T "$LDS" -shared -Bsymbolic \
     "$CRT" "$WORK/$name.o" -L"$LIBDIR" -lefi -lgnuefi -o "$WORK/$name.so"
