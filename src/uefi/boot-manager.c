@@ -180,8 +180,6 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
      */
     while (Path[i] == L'\\' || Path[i] == L'/') ++i;
     for (;;) {
-#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-#endif
         j = 0;
         while (Path[i] != 0 && Path[i] != L'\\' && Path[i] != L'/') {
             if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
