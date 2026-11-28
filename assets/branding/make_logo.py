@@ -1,10 +1,15 @@
 """SelectOS logo generator. Run: python3 make_logo.py  (needs: pip install cairosvg fonttools)"""
+import argparse
+import os
+import sys
+
 import cairosvg
 from fontTools.ttLib import TTFont
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 
-FONT = "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf"
+FONT = None
+FONT_MEDIUM = None
 BLUE_LIGHT, BLUE_DARK = "#5b9bff", "#2f5fe0"
 
 def text_path(text, size, x, baseline, tracking=0, font=None):
@@ -60,7 +65,6 @@ def lockup(dark=True, v="cursor"):
             f'<svg x="10" y="40" width="220" height="220" viewBox="32 32 448 448">{mark_body(v)}</svg>'
             f'<path d="{d1}" fill="{t1}"/><path d="{d2}" fill="{t2}"/></svg>'), w
 
-import os, sys
 def build(v, root):
     os.makedirs(f"{root}/png", exist_ok=True); os.makedirs(f"{root}/svg", exist_ok=True)
     open(f"{root}/svg/selectos-mark.svg", "w").write(mark_svg(512, v))
@@ -92,7 +96,7 @@ def sheet(v, root):
 def social(v, root):
     """1280x640 GitHub social-preview card (Settings > Social preview)."""
     d, w = lockup(True, v)
-    medium = FONT.replace("Bold", "Medium")
+    medium = FONT_MEDIUM
     tag = "Lightweight UEFI multi-boot selector"
     tw = width_of(tag, 40)  # approximate; centred below
     p, _ = text_path(tag, 40, (1280 - 0.93 * tw) / 2, 520, 0, medium)
@@ -106,7 +110,31 @@ def social(v, root):
     open(f"{root}/svg/social-preview.svg", "w").write(out)
     cairosvg.svg2png(bytestring=out.encode(), write_to=f"{root}/png/social-preview.png", output_width=1280)
 
-build("cursor", "."); sheet("cursor", "."); social("cursor", ".")
-if "--alt" in sys.argv:  # optional alternative mark (check mark)
-    build("check", "alt-check"); sheet("check", "alt-check")
-print("done")
+def main():
+    parser = argparse.ArgumentParser(description="Generate SelectOS logo SVG and PNG assets.")
+    parser.add_argument("--font-bold", default=os.environ.get("SELECTOS_FONT_BOLD"),
+                        help="Path to a licensed Poppins Bold TTF (or SELECTOS_FONT_BOLD).")
+    parser.add_argument("--font-medium", default=os.environ.get("SELECTOS_FONT_MEDIUM"),
+                        help="Path to a licensed Poppins Medium TTF (or SELECTOS_FONT_MEDIUM).")
+    parser.add_argument("--output-dir", default=".", help="Output directory (default: current directory).")
+    parser.add_argument("--alt", action="store_true", help="Also generate the check-mark variant.")
+    args = parser.parse_args()
+
+    for label, path in (("Poppins Bold", args.font_bold), ("Poppins Medium", args.font_medium)):
+        if not path or not os.path.isfile(path):
+            parser.error(f"{label} font file is required and must exist; pass the matching --font-* option.")
+    global FONT, FONT_MEDIUM
+    FONT, FONT_MEDIUM = args.font_bold, args.font_medium
+
+    build("cursor", args.output_dir)
+    sheet("cursor", args.output_dir)
+    social("cursor", args.output_dir)
+    if args.alt:
+        alt_dir = os.path.join(args.output_dir, "alt-check")
+        build("check", alt_dir)
+        sheet("check", alt_dir)
+    print(f"Brand assets written to {os.path.abspath(args.output_dir)}")
+
+
+if __name__ == "__main__":
+    main()
