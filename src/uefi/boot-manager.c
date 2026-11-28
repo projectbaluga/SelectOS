@@ -46,6 +46,14 @@ static VOID WriteTestDiagnostics(VOID) {
             if (EFI_ERROR(Status) || Root == NULL) continue;
             Status = uefi_call_wrapper(Root->Open, 5, Root, &File, L"\\selectos-debug.log",
                                        EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
+            /* Retry with a volume-relative name for firmware implementations
+             * whose root handles reject a leading backslash.
+             */
+            if (EFI_ERROR(Status)) {
+                File = NULL;
+                Status = uefi_call_wrapper(Root->Open, 5, Root, &File, L"selectos-debug.log",
+                                           EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
+            }
             if (!EFI_ERROR(Status) && File != NULL) {
                 uefi_call_wrapper(File->SetPosition, 2, File, 0);
                 uefi_call_wrapper(File->Write, 3, File, &WriteLength, Buffer);
@@ -198,7 +206,7 @@ static VOID ScanVolume(EFI_HANDLE Device) {
     Status = uefi_call_wrapper(BS->HandleProtocol, 3, Device, &SimpleFsGuid, (VOID **)&Fs);
     if (EFI_ERROR(Status) || Fs == NULL) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        CHAR16 Marker[] = L"SELECTOS_SCAN_HANDLE_PROTOCOL_FAILED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_HANDLE_PROTOCOL_FAILED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
 #endif
         return;
@@ -206,14 +214,14 @@ static VOID ScanVolume(EFI_HANDLE Device) {
     Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
     if (EFI_ERROR(Status) || Root == NULL) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        CHAR16 Marker[] = L"SELECTOS_SCAN_OPEN_VOLUME_FAILED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_OPEN_VOLUME_FAILED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
 #endif
         return;
     }
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_VOLUME_OPENED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_VOLUME_OPENED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
@@ -221,7 +229,7 @@ static VOID ScanVolume(EFI_HANDLE Device) {
         if (EntryCount >= MAX_BOOT_ENTRIES) break;
         if (FileExists(Root, KnownLoaders[j].Path)) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-            CHAR16 Marker[] = L"SELECTOS_SCAN_ALLOWLISTED_LOADER_FOUND\\r\\n";
+            CHAR16 Marker[] = L"SELECTOS_SCAN_ALLOWLISTED_LOADER_FOUND\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
 #endif
             Entries[EntryCount].Device = Device;
@@ -247,13 +255,13 @@ static VOID ScanFilesystems(EFI_HANDLE ImageHandle) {
                                &LoadedImageProtocol, (VOID **)&LoadedImage);
     if (!EFI_ERROR(Status) && LoadedImage != NULL && LoadedImage->DeviceHandle != NULL) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        CHAR16 Marker[] = L"SELECTOS_SCAN_LOADED_IMAGE_VOLUME\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_LOADED_IMAGE_VOLUME\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
 #endif
         ScanVolume(LoadedImage->DeviceHandle);
     } else {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        CHAR16 Marker[] = L"SELECTOS_SCAN_NO_LOADED_IMAGE_VOLUME\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_NO_LOADED_IMAGE_VOLUME\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
 #endif
     }
@@ -261,13 +269,13 @@ static VOID ScanFilesystems(EFI_HANDLE ImageHandle) {
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (EFI_ERROR(Status)) {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_LOCATE_FAILED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_LOCATE_FAILED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     } else if (HandleCount == 0 || Handles == NULL) {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_NO_FS_HANDLES\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_NO_FS_HANDLES\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     } else {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_FS_HANDLES_FOUND\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_FS_HANDLES_FOUND\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
@@ -280,10 +288,10 @@ static VOID ScanFilesystems(EFI_HANDLE ImageHandle) {
     }
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (EntryCount == 0) {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_ZERO_ENTRIES\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_ZERO_ENTRIES\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     } else {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_ENTRIES_FOUND\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_ENTRIES_FOUND\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
