@@ -16,7 +16,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
                                &LoadedImageProtocol, (VOID **)&LoadedImage);
     if (EFI_ERROR(Status) || LoadedImage == NULL) return EFI_LOAD_ERROR;
     Status = uefi_call_wrapper(BS->HandleProtocol, 3, LoadedImage->DeviceHandle,
-                               &SimpleFileSystemProtocol, (VOID **)&FileSystem);
+                               &FileSystemProtocol, (VOID **)&FileSystem);
     if (EFI_ERROR(Status) || FileSystem == NULL) return EFI_UNSUPPORTED;
     Status = uefi_call_wrapper(FileSystem->OpenVolume, 2, FileSystem, &Root);
     if (EFI_ERROR(Status) || Root == NULL) return Status;
