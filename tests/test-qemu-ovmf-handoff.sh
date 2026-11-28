@@ -65,14 +65,21 @@ build_efi "$ROOT/tests/uefi-handoff-child.c" "$WORK/grubx64.efi" handoff-child
   exit 1
 }
 cp "$ROOT/EFI/BOOT/grubx64.efi" "$WORK/BOOTX64.EFI"
+echo "SelectOS EFI PE/COFF headers:" >&2
+objdump -p "$WORK/selectos.efi" >&2
+ echo "SelectOS EFI section table:" >&2
+objdump -h "$WORK/selectos.efi" >&2
 cat > "$WORK/grub.cfg" <<'GRUB'
 set timeout=0
 set default=0
 echo SELECTOS_OVMF_GRUB_CONFIG_LOADED
 set root=(hd0)
 echo SELECTOS_GRUB_ROOT=$root
-ls /EFI/SelectOS/
-chainloader /EFI/SelectOS/selectos.efi
+echo SELECTOS_GRUB_FILE_LOOKUP_BEGIN
+ls -l (hd0)/EFI/SelectOS/
+echo SELECTOS_GRUB_FILE_LOOKUP_DONE
+chainloader (hd0)/EFI/SelectOS/selectos.efi
+echo SELECTOS_GRUB_CHAINLOADER_ACCEPTED
 boot
 GRUB
 
