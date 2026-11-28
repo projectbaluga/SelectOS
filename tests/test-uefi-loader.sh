@@ -10,6 +10,11 @@ fi
 grep -q 'LocateHandleBuffer' "$SRC"
 grep -q 'EFI_FILE_MODE_READ' "$SRC"
 grep -q 'BuildFileDevicePath' "$SRC"
+grep -q 'LocalPrint' "$SRC"
+if grep -Eq '(^|[^[:alnum:]_])Print[[:space:]]*\\(' "$SRC"; then
+  echo "UEFI loader must not call GNU-EFI Print/CatPrint." >&2
+  exit 1
+fi
 if grep -Eq '(^|[^[:alnum:]_])FileDevicePath[[:space:]]*\(' "$SRC"; then
   echo "UEFI loader must not depend on the distro GNU-EFI FileDevicePath helper." >&2
   exit 1
