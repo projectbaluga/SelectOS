@@ -5,7 +5,7 @@ WORK="$(mktemp -d)"
 cleanup() { rm -rf -- "$WORK"; }
 trap cleanup EXIT
 
-for cmd in gcc ld objcopy qemu-system-x86_64 mkfs.vfat mmd mcopy mtype python3 timeout; do
+for cmd in gcc ld objcopy qemu-system-x86_64 parted mformat mmd mcopy mtype python3 timeout; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "ERROR: Missing QEMU/OVMF test dependency: $cmd" >&2
     exit 1
@@ -52,12 +52,16 @@ build_efi "$ROOT/src/uefi/boot-manager.c" "$WORK/BOOTX64.EFI" boot-manager
 build_efi "$ROOT/tests/uefi-handoff-child.c" "$WORK/grubx64.efi" handoff-child
 
 truncate -s 64M "$WORK/uefi-test.img"
-mkfs.vfat -F 32 "$WORK/uefi-test.img" >/dev/null
-mmd -i "$WORK/uefi-test.img" ::/EFI
-mmd -i "$WORK/uefi-test.img" ::/EFI/BOOT
-mmd -i "$WORK/uefi-test.img" ::/EFI/ubuntu
-mcopy -i "$WORK/uefi-test.img" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
-mcopy -i "$WORK/uefi-test.img" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
+parted -s "$WORK/uefi-test.img" mklabel gpt
+parted -s "$WORK/uefi-test.img" mkpart ESP fat32 1MiB 100%
+parted -s "$WORK/uefi-test.img" set 1 esp on
+FAT_IMAGE="$WORK/uefi-test.img@@1048576"
+mformat -i "$FAT_IMAGE" -F ::
+mmd -i "$FAT_IMAGE" ::/EFI
+mmd -i "$FAT_IMAGE" ::/EFI/BOOT
+mmd -i "$FAT_IMAGE" ::/EFI/ubuntu
+mcopy -i "$FAT_IMAGE" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
+mcopy -i "$FAT_IMAGE" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
 
 python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" <<'PY'
 import json, os, socket, subprocess, sys, tempfile, time
@@ -137,7 +141,7 @@ finally:
         pass
 PY
 
-if ! mtype -i "$WORK/uefi-test.img" ::/handoff.ok > "$WORK/handoff.txt" 2>/dev/null; then
+if ! mtype -i "$FAT_IMAGE" ::/handoff.ok > "$WORK/handoff.txt" 2>/dev/null; then
   echo "ERROR: QEMU/OVMF did not create the child-loader handoff marker." >&2
   echo "The firmware boot, menu input, or LoadImage/StartImage path did not complete." >&2
   exit 1
