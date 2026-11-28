@@ -65,12 +65,14 @@ docker compose up -d --build
 
 healthy=0
 for _ in $(seq 1 40); do
-  if curl -fsS "http://127.0.0.1:${SELECTOS_AUTH_PORT:-8088}/healthz" >/dev/null 2>&1; then healthy=1; break; fi
+  if docker compose exec -T auth wget -q -O /dev/null http://127.0.0.1:8088/healthz >/dev/null 2>&1; then healthy=1; break; fi
   sleep 2
 done
 [[ "$healthy" -eq 1 ]] || { docker compose ps; die "Health check failed. Inspect logs with: docker compose logs --tail=100 auth"; }
 
+AUTH_PORT="$(sed -n 's/^SELECTOS_AUTH_PORT=//p' "$ENV_FILE" | tail -n1)"
+AUTH_PORT="${AUTH_PORT:-8088}"
 printf '\nSelectOS Server is healthy.\n'
 docker compose ps
-printf '\nDashboard endpoint (local server): http://127.0.0.1:${SELECTOS_AUTH_PORT:-8088}/dashboard/\n'
+printf '\nDashboard endpoint (local server): http://127.0.0.1:%s/dashboard/\n' "$AUTH_PORT"
 printf 'For LAN access, configure the documented TLS reverse proxy; do not expose plain HTTP on an untrusted network.\n'
