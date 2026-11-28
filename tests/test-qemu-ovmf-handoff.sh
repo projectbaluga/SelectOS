@@ -5,7 +5,7 @@ WORK="$(mktemp -d)"
 cleanup() { rm -rf -- "$WORK"; }
 trap cleanup EXIT
 
-for cmd in gcc ld objcopy qemu-system-x86_64 mformat mmd mcopy mtype python3 timeout; do
+for cmd in gcc ld objcopy qemu-system-x86_64 mkfs.vfat mmd mcopy mtype python3 timeout; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "ERROR: Missing QEMU/OVMF test dependency: $cmd" >&2
     exit 1
@@ -66,7 +66,7 @@ truncate -s 64M "$WORK/uefi-test.img"
 # A whole-device FAT32 removable-media volume exercises the UEFI fallback
 # path without depending on GPT/ESP partition auto-discovery.
 FAT_IMAGE="$WORK/uefi-test.img"
-mformat -i "$FAT_IMAGE" -F ::
+mkfs.vfat -F 32 -n SELECTOS "$FAT_IMAGE"
 mmd -i "$FAT_IMAGE" ::/EFI
 mmd -i "$FAT_IMAGE" ::/EFI/BOOT
 mmd -i "$FAT_IMAGE" ::/EFI/ubuntu
