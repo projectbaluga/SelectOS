@@ -179,10 +179,10 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
     /* Walk one component at a time. This avoids firmware-specific differences
      * in how root handles parse multi-component absolute/relative paths.
      */
-    while (Path[i] == L'\\\\' || Path[i] == L'/') ++i;
+    while (Path[i] == L'\\' || Path[i] == L'/') ++i;
     for (;;) {
         j = 0;
-        while (Path[i] != 0 && Path[i] != L'\\\\' && Path[i] != L'/') {
+        while (Path[i] != 0 && Path[i] != L'\\' && Path[i] != L'/') {
             if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
                 if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
                 return NULL;
@@ -204,7 +204,7 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
                 ConsoleWriteString(Component);
                 ConsoleWriteString(L" status=");
                 ConsoleWriteHex((UINTN)OpenStatus);
-                ConsoleWriteString(L"\\r\\n");
+                ConsoleWriteString(L"\r\n");
             }
 #endif
             if (EFI_ERROR(OpenStatus) || Next == NULL) {
@@ -215,7 +215,7 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
         if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
         Current = Next;
         OwnsCurrent = TRUE;
-        while (Path[i] == L'\\\\' || Path[i] == L'/') ++i;
+        while (Path[i] == L'\\' || Path[i] == L'/') ++i;
         if (Path[i] == 0) return Current;
     }
 }
@@ -223,8 +223,8 @@ static BOOLEAN FileExists(EFI_FILE_HANDLE Root, const CHAR16 *Path) {
     EFI_FILE_HANDLE File = OpenPathFromRoot(Root, Path);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (Path == KnownLoaders[2].Path) {
-        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\\r\\n";
-        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_TEST_CHILD_PATH_OPENED\r\n";
+        CHAR16 Missing[] = L"SELECTOS_TEST_CHILD_PATH_NOT_FOUND\r\n";
         if (File != NULL) uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         else uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Missing);
     }
