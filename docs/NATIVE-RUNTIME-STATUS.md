@@ -1,40 +1,33 @@
 # Native SelectOS runtime — implementation status
 
-## Scope of the first implementation
+## Current experimental scope
 
-This branch introduces a source-controlled native initramfs/PID 1 instead of modifying the opaque Gate/Gbox binary. It is deliberately a **bring-up diagnostic runtime**, not a complete multi-boot selector.
+This branch introduces a source-controlled native initramfs/PID 1 instead of modifying the opaque Gate/Gbox binary. It remains a **bring-up prototype**, not a complete multi-boot release.
 
 Implemented:
-- Source-controlled PID 1 startup script.
-- Mounts proc, sysfs, devtmpfs, devpts, and volatile tmpfs filesystems with safe fallbacks.
-- Populates device nodes with BusyBox mdev where available.
-- Displays SelectOS branding and reports detected block devices.
-- No username/password prompt, auth client, LAN, internet, PostgreSQL, or server dependency.
-- Reproducible initramfs packaging using statically linked BusyBox and cpio newc + deterministic gzip.
-- Separate experimental artifacts under dist/native/; the legacy boot/select.img and current image builder are not overwritten.
-- Build manifest and SHA-256 checksums explicitly mark the runtime as not production-ready.
+- Source-controlled PID 1 mounts proc, sysfs, devtmpfs, devpts, and volatile tmpfs, populates device nodes with BusyBox mdev, and reports detected block devices.
+- PID 1 has no username/password prompt, auth client, LAN, internet, PostgreSQL, or server dependency.
+- Reproducible initramfs packaging uses statically linked BusyBox and cpio newc + deterministic gzip. Output is separate under dist/native; the legacy boot/select.img is not overwritten. A compatible kernel must be supplied separately.
+- `scripts/discover-efi-entries.py` enumerates partition nodes from sysfs and identifies EFI System Partitions by GPT type GUID. Default mode reads metadata only. Optional `--mount` uses `ro,nosuid,nodev,noexec` and checks a fixed list of known Windows/Linux EFI loader paths; it never executes them.
+- `scripts/select-boot-entry.py` is a keyboard-driven menu prototype that consumes discovery JSON. It accepts only a numeric menu index and an explicit allowlist of loader paths, then prints a selection record. It does **not** execute a loader, modify UEFI variables, or chainload.
+- Unit tests cover GPT GUID recognition, discovery edge cases, path allowlisting, and device path validation.
 
-## Phase 2 prototype — GPT ESP and loader discovery
+## Host-side prototype usage
 
-`scripts/discover-efi-entries.py` is a host-side, read-only discovery prototype. It:
-- Enumerates partition nodes from sysfs and asks `blkid` for partition metadata.
-- Identifies EFI System Partitions by the GPT type GUID (not by partition number or label).
-- By default, reads metadata only and does not mount or modify disks.
-- With explicit `--mount`, temporarily mounts each detected ESP using `ro,nosuid,nodev,noexec`, checks a bounded allowlist of common Windows/Linux EFI loader paths, and unmounts it.
-- Emits JSON suitable for a future selector UI.
+On a Linux test machine with Python 3:
 
-Run on a Linux test machine:
+    python3 scripts/discover-efi-entries.py > /tmp/selectos-efi.json
+    sudo python3 scripts/discover-efi-entries.py --mount > /tmp/selectos-efi.json
+    python3 scripts/select-boot-entry.py --input /tmp/selectos-efi.json
 
-    python3 scripts/discover-efi-entries.py
-    python3 scripts/discover-efi-entries.py --mount
+The first scanner command only reads partition metadata. The second requires root and temporarily mounts discovered ESPs read-only. The selector is an interactive terminal prototype; it outputs a validated record only.
 
-The optional mount mode requires root and working `blkid`, `mount`, and `umount`. It never mounts read-write and does not execute discovered EFI files. This prototype is **not wired into PID 1** and is not yet part of the initramfs image.
+Run tests:
 
-Run its source tests:
+    python3 tests/test-efi-discovery.py
+    python3 tests/test-boot-selector.py
 
-    python3 -m unittest tests/test-efi-discovery.py
-
-## Build the experimental initramfs
+## Experimental initramfs build
 
 On Debian/Ubuntu:
 
@@ -42,42 +35,33 @@ On Debian/Ubuntu:
     sudo apt-get install -y busybox-static cpio gzip coreutils file
     bash scripts/build-native-initramfs.sh
 
-Output:
-- dist/native/select-native.img
-- dist/native/BUILD-INFO.txt
-- dist/native/SHA256SUMS
-
-The script does not write a USB, replace boot/select.img, or touch the existing legacy artifact. It does not include a kernel; the image build must supply a compatible kernel separately.
+Output: `dist/native/select-native.img`, `BUILD-INFO.txt`, and `SHA256SUMS`. This archive is not a complete bootable OS image and does not include a kernel.
 
 ## Optional Control Center connection
 
-Control Center is not contacted by PID 1. To connect an installed Linux SelectOS PC after its operating system starts, use the guided agent installer from a repository checkout. See [Connect a SelectOS Linux PC to Control Center](CONTROL-CENTER-CONNECT.md).
+Control Center is not contacted by PID 1. The optional Linux agent runs only after the installed OS starts and reports inventory/health. It does not provide remote command execution, remote desktop, reboot/shutdown, or login synchronization. Server outage does not block local boot or use. See [Control Center connection guide](CONTROL-CENTER-CONNECT.md).
 
-The agent reports inventory/health only. It does not provide remote command execution, remote desktop, reboot/shutdown, or login synchronization. Server outage does not block local boot or use.
+## Not implemented / not validated
 
-## What is not implemented yet
+1. The scanner and selector are host-side Python prototypes, not included in the initramfs and not invoked by PID 1.
+2. Full filesystem and vendor-specific boot-entry discovery, architecture-aware loader selection, and robust duplicate-entry handling.
+3. An audited UEFI handoff/chainloader, firmware fallback, Secure Boot handling, and persistent boot configuration.
+4. QEMU/OVMF and physical UEFI validation of Windows and Linux boot.
+5. Recovery UI and production-grade failure handling.
 
-1. Integrating the ESP scanner into the native initramfs (including the required static tooling).
-2. Full Windows/Linux boot-entry parsing, including vendor-specific layouts and architecture-aware fallback handling.
-3. Keyboard-driven OS selector and recovery UI.
-4. UEFI handoff/chainloading and fallback behavior.
-5. Persistent configuration and controlled power actions.
-6. QEMU/OVMF and physical UEFI boot validation.
+This code does **not** yet boot Windows or Linux. Do not flash or deploy it as a replacement for the current working image.
 
-This milestone does **not** prove SelectOS can boot another operating system. Do not flash or deploy it as a replacement for the current working image.
+## Next engineering steps
 
-## Next phases
-
-- Add fixture-backed tests for actual GPT images and more filesystems.
-- Port the bounded, read-only scanner into a small static initramfs utility.
-- Build a keyboard-accessible selector whose choices are restricted to enumerated loader paths.
-- Implement and test a narrowly scoped EFI handoff, including Secure Boot implications.
-- Validate Windows and Linux selection, offline operation, and recovery on QEMU/OVMF and physical UEFI hardware before release.
+- Replace host-side Python dependencies with a small static scanner suitable for the initramfs.
+- Integrate discovery and selector into native PID 1 only after the static utility is tested.
+- Implement a narrowly scoped UEFI handoff with strict path validation and explicit cancellation/fallback.
+- Test GPT disk fixtures, malformed metadata, multiple ESPs, Secure Boot, QEMU/OVMF, and physical machines before release.
 
 ## Safety rules
 
-- Never overwrite boot/select.img from the experimental build script.
+- Never overwrite the existing boot/select.img from the experimental build script.
 - Never partition, format, repair, or write to disks during discovery.
-- Never execute a discovered loader from the scanner.
-- Never require the server for initial boot.
+- Never execute discovered EFI files from the scanner or selector prototype.
+- Never require the Control Center/server for initial boot.
 - Never describe this milestone as a complete login-free multi-boot release.
