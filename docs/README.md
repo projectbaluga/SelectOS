@@ -19,3 +19,7 @@ The legacy boot image receives the configuration as `/gate.json`; `scripts/build
 ## No-login migration
 
 The current prebuilt Gate/Gbox runtime may still display its legacy login. Removing that prompt requires replacing or rebuilding the initramfs from source. See [NO-LOGIN-MIGRATION.md](NO-LOGIN-MIGRATION.md) for the migration contract and acceptance tests.
+
+## Server management
+
+See [CONTROL-CENTER.md](CONTROL-CENTER.md) for the Debian LAN dashboard, device agent, API, TLS reverse proxy, backups, and restore operations.
