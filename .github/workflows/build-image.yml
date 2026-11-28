@@ -82,7 +82,7 @@ jobs:
           bash tests/test-native-image-builder.sh
 
       - name: Build native experimental initramfs
-        run: bash scripts/build-native-initramfs.sh
+        run: sudo bash scripts/build-native-initramfs.sh
 
       - name: Package native experimental image
         env:
