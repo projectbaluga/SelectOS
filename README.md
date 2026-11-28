@@ -4,7 +4,7 @@ Lightweight UEFI multi-boot selector. The project is transitioning away from the
 
 **Authentication decision:** central authentication is deferred for a future release. The SelectOS boot path must not depend on the Debian authentication server, PostgreSQL, LAN, or internet access. The intended initial experience is a direct boot into the SelectOS operating-system selector without a login prompt.
 
-> **Important current limitation:** the boot image still uses the prebuilt legacy Gate initramfs extracted from \`gate-test.img.gz\`. That binary contains the legacy Gate application and its login/UI behavior. Its full source and reproducible build recipe are not present here. Therefore the current image is **not login-free**, and this change does not claim to remove the Gbox login. See [the no-login runtime migration plan](docs/NO-LOGIN-MIGRATION.md).
+> **Important current limitation:** the boot image still uses the prebuilt legacy Gate initramfs extracted from `gate-test.img.gz`. That binary contains the legacy Gate application and its login/UI behavior. Its full source and reproducible build recipe are not present here. Therefore the current image is **not login-free**, and this change does not claim to remove the Gbox login. See [the no-login runtime migration plan](docs/NO-LOGIN-MIGRATION.md).
 
 ## Current and target boot components
 
@@ -19,7 +19,7 @@ Lightweight UEFI multi-boot selector. The project is transitioning away from the
 ## Authentication is deferred
 
 - No authentication server, PostgreSQL service, login client, or network connection is required to boot or use the selector.
-- Existing \`auth/server\` and \`auth/client\` source is retained for future work; it is not installed into the boot image.
+- Existing `auth/server` and `auth/client` source is retained for future work; it is not installed into the boot image.
 - Do not add an authentication prompt or make boot conditional on successful authentication in the initial login-free milestone.
 - The old Gate/Gbox login cannot be removed by editing GRUB or the image packager. The initramfs/PID 1 runtime must be replaced or rebuilt from complete source.
 
@@ -30,33 +30,33 @@ The current image builder can package the legacy runtime only when explicitly op
 GitHub Actions:
 1. Open **Actions**.
 2. Select **Build legacy-compatible SelectOS image**.
-3. Run the workflow on \`main\`.
-4. The artifact is named \`SelectOS-legacy-Gate-runtime\` and includes a build manifest warning that the legacy login remains.
+3. Run the workflow on `main`.
+4. The artifact is named `SelectOS-legacy-Gate-runtime` and includes a build manifest warning that the legacy login remains.
 
 Local build on Ubuntu/Debian:
 
-\`\`\`bash
+```bash
 sudo apt-get update
 sudo apt-get install -y parted dosfstools util-linux
 sudo SELECTOS_ALLOW_LEGACY_GATE_RUNTIME=1 bash scripts/build-image.sh
-\`\`\`
+```
 
-The output is \`dist/SelectOS.img\`, a 512 MiB FAT32 UEFI image. The explicit opt-in is deliberate: it prevents the legacy binary from being mistaken for the future login-free runtime.
+The output is `dist/SelectOS.img`, a 512 MiB FAT32 UEFI image. The explicit opt-in is deliberate: it prevents the legacy binary from being mistaken for the future login-free runtime.
 
 **Do not write a legacy artifact to a production USB expecting the Gbox login to be gone.**
 
 ### Experimental native image artifact
 
-The image workflow also builds a separate \`SelectOS-native-experimental\` artifact.
+The image workflow also builds a separate `SelectOS-native-experimental` artifact.
 It includes an in-initramfs read-only EFI System Partition scan and a
 keyboard-operated diagnostic menu. Selecting an item currently records the
 choice only; it does not boot the selected OS. The image manifest remains
-\`PRODUCTION_READY=false\`. See
+`PRODUCTION_READY=false`. See
 [the experimental native image build guide](docs/EXPERIMENTAL-NATIVE-IMAGE.md).
 
 ## Server management dashboard
 
-The LAN-only SelectOS Control Center is served by the Debian Go server at \`/dashboard\`. It includes administrator access, host health metrics, a device registry with per-device enrollment tokens and heartbeat agent, audit events, and PostgreSQL backup inventory/scripts. See [docs/CONTROL-CENTER.md](docs/CONTROL-CENTER.md) for deployment, TLS, enrollment, and recovery instructions. The dashboard is separate from PC boot authentication; it does not add a login requirement to SelectOS boot.
+The LAN-only SelectOS Control Center is served by the Debian Go server at `/dashboard`. It includes administrator access, host health metrics, a device registry with per-device enrollment tokens and heartbeat agent, audit events, and PostgreSQL backup inventory/scripts. See [docs/CONTROL-CENTER.md](docs/CONTROL-CENTER.md) for deployment, TLS, enrollment, and recovery instructions. The dashboard is separate from PC boot authentication; it does not add a login requirement to SelectOS boot.
 
 ## No-login runtime implementation
 
@@ -64,11 +64,11 @@ Read [docs/NO-LOGIN-MIGRATION.md](docs/NO-LOGIN-MIGRATION.md) for the required s
 
 ## Configuration
 
-Edit \`config/select.json\` for the current legacy selector's branding and OS presentation rules. The legacy initramfs reads the compatibility copy at \`/gate.json\`. A native runtime should define and document its own stable configuration schema rather than silently assuming these legacy paths.
+Edit `config/select.json` for the current legacy selector's branding and OS presentation rules. The legacy initramfs reads the compatibility copy at `/gate.json`. A native runtime should define and document its own stable configuration schema rather than silently assuming these legacy paths.
 
 ## Project structure
 
-\`\`\`text
+```text
 SelectOS/
 ├── .github/workflows/
 ├── auth/                    # future LAN authentication source; not in boot path
@@ -77,7 +77,7 @@ SelectOS/
 ├── docs/NO-LOGIN-MIGRATION.md
 ├── scripts/build-image.sh
 └── src/                     # native runtime source to be implemented
-\`\`\`
+```
 
 ## Release status
 

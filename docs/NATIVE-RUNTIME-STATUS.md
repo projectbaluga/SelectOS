@@ -17,7 +17,7 @@ Implemented:
   separately.
 - A small BusyBox-shell EFI scanner is included in the initramfs. It reads
   partition metadata, recognizes the GPT EFI System Partition GUID, mounts
-  candidate ESPs only with \`ro,nosuid,nodev,noexec\`, checks fixed allowlisted
+  candidate ESPs only with `ro,nosuid,nodev,noexec`, checks fixed allowlisted
   loader paths, and unmounts immediately.
 - A keyboard menu accepts only a numeric index or cancel. It prints a
   diagnostic selection record; it never executes the EFI file or changes
@@ -54,7 +54,7 @@ On Debian/Ubuntu:
     sudo apt-get install -y busybox-static cpio gzip coreutils file
     sudo bash scripts/build-native-initramfs.sh
 
-Output: \`dist/native/select-native.img\`, \`BUILD-INFO.txt\`, and \`SHA256SUMS\`.
+Output: `dist/native/select-native.img`, `BUILD-INFO.txt`, and `SHA256SUMS`.
 This archive is not a complete bootable OS image and does not include a kernel.
 
 ## Optional Control Center connection
