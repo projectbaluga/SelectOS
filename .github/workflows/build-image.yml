@@ -8,7 +8,12 @@ on:
       - "scripts/build-native-image.sh"
       - "src/native-initramfs/**"
       - "tests/test-native-image-builder.sh"
+      - "tests/test-native-efi-menu.sh"
+      - "tests/test-native-init.sh"
+      - "tests/test-efi-discovery.py"
+      - "tests/test-boot-selector.py"
       - "docs/EXPERIMENTAL-NATIVE-IMAGE.md"
+      - "docs/NATIVE-RUNTIME-STATUS.md"
       - "README.md"
       - ".github/workflows/build-image.yml"
       - "config/**"
@@ -53,7 +58,7 @@ jobs:
           mkdir -p "$WORK/source"
           gzip -dc "$SOURCE" > "$WORK/source.img"
           LOOP="$(sudo losetup --find --show --partscan "$WORK/source.img")"
-          PART="${LOOP}p1"
+          PART="\${LOOP}p1"
           for attempt in {1..10}; do
             [[ -b "$PART" ]] && break
             sleep 1
@@ -74,13 +79,19 @@ jobs:
             [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
-      - name: Validate image builder syntax and safety
+      - name: Validate shell syntax and regression tests
         run: |
           bash -n scripts/build-image.sh
           bash -n scripts/build-native-initramfs.sh
           bash -n scripts/build-native-image.sh
+          bash -n src/native-initramfs/init
+          bash -n src/native-initramfs/efi-menu
           bash -n tests/test-native-image-builder.sh
+          bash -n tests/test-native-efi-menu.sh
           bash tests/test-native-image-builder.sh
+          bash tests/test-native-efi-menu.sh
+          python3 tests/test-efi-discovery.py
+          python3 tests/test-boot-selector.py
 
       - name: Build native experimental initramfs
         run: sudo bash scripts/build-native-initramfs.sh
@@ -95,7 +106,9 @@ jobs:
           test -s dist/native/select-native.img
           test -s dist/native/SelectOS-native-experimental.img
           grep -q '^PRODUCTION_READY=false$' dist/native/IMAGE-BUILD-INFO.txt
-          grep -q '^RUNTIME=native-initramfs-bringup$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^OS_DISCOVERY=read-only-efi-esp-scan$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^BOOT_SELECTOR=keyboard-menu-selection-record-only$' dist/native/IMAGE-BUILD-INFO.txt
+          grep -q '^UEFI_CHAINLOADER=not-implemented$' dist/native/IMAGE-BUILD-INFO.txt
           sha256sum --check dist/native/IMAGE-SHA256SUMS
 
       - name: Build explicitly marked legacy compatibility image
@@ -136,21 +149,21 @@ jobs:
     needs: build
     # Pull-request runs can come from forks and must not receive an Actions write token.
     # Cleanup runs after manual image builds, even if the build job fails.
-    if: ${{ always() && github.event_name != 'pull_request' }}
+    if: \${{ always() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
       - name: Delete previous completed workflow runs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: \${{ github.repository }}
+          CURRENT_RUN_ID: \${{ github.run_id }}
         shell: bash
         run: |
           set -Eeuo pipefail
           echo "Finding completed workflow runs to clean up..."
-          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
+          gh api --paginate "repos/\${GH_REPO}/actions/runs?per_page=100" \\
             --jq '.workflow_runs[] | select(.status == "completed") | .id' |
           while IFS= read -r run_id; do
             [[ -n "$run_id" ]] || continue
@@ -158,5 +171,5 @@ jobs:
               continue
             fi
             echo "Deleting completed workflow run $run_id"
-            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
+            gh api --method DELETE "repos/\${GH_REPO}/actions/runs/\${run_id}"
           done
