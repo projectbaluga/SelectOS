@@ -27,7 +27,10 @@ Run tests:
     python3 tests/test-efi-discovery.py
     python3 tests/test-boot-selector.py
 
-## Experimental initramfs build
+## Experimental initramfs and image build
+
+The separate UEFI image packager is documented in [EXPERIMENTAL-NATIVE-IMAGE.md](EXPERIMENTAL-NATIVE-IMAGE.md). It assembles a GPT/FAT32 image using the native diagnostic initramfs and marks the artifact `PRODUCTION_READY=false`. It is intentionally separate from the legacy image output.
+
 
 On Debian/Ubuntu:
 
