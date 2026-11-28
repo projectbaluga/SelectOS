@@ -28,8 +28,12 @@ services:
       SELECTOS_AUTH_TOKEN_KEY: ${SELECTOS_AUTH_TOKEN_KEY:?Set SELECTOS_AUTH_TOKEN_KEY in .env}
       SELECTOS_ADMIN_USER: ${SELECTOS_ADMIN_USER:-admin}
       SELECTOS_ADMIN_PASSWORD: ${SELECTOS_ADMIN_PASSWORD:?Set SELECTOS_ADMIN_PASSWORD in .env}
+      SELECTOS_DEVICE_ENROLLMENT_TOKEN: ${SELECTOS_DEVICE_ENROLLMENT_TOKEN:?Set SELECTOS_DEVICE_ENROLLMENT_TOKEN in .env}
+      SELECTOS_BACKUP_DIR: /var/lib/selectos/backups
+    volumes:
+      - ./backups:/var/lib/selectos/backups:ro
     ports:
-      - "${SELECTOS_AUTH_PORT:-8088}:8088"
+      - "${SELECTOS_BIND_IP:-127.0.0.1}:${SELECTOS_AUTH_PORT:-8088}:8088"
     depends_on:
       postgres:
         condition: service_healthy
