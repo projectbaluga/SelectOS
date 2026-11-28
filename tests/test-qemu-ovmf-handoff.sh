@@ -53,14 +53,25 @@ build_efi() {
     "$WORK/$name.so" "$out"
   file "$out" | grep -q 'PE32+.*EFI.*application.*x86-64'
 }
-build_efi "$ROOT/src/uefi/boot-manager.c" "$WORK/BOOTX64.EFI" boot-manager
+build_efi "$ROOT/src/uefi/boot-manager.c" "$WORK/selectos.efi" boot-manager
 build_efi "$ROOT/tests/uefi-handoff-child.c" "$WORK/grubx64.efi" handoff-child
-echo "UEFI application PE header:"
-objdump -p "$WORK/BOOTX64.EFI" | grep -E "file format|Magic|AddressOfEntryPoint|ImageBase|Subsystem|Machine"
-echo "UEFI application section table:"
-objdump -h "$WORK/BOOTX64.EFI"
-echo "Disassembly near observed OVMF exception offset 0x7e7d:"
-objdump -d -Mintel "$WORK/BOOTX64.EFI" | grep -i -B 8 -A 8 "7e7d" || true
+
+# Use the known-good GRUB EFI binary extracted from the repository's
+# compatibility image as the firmware fallback. GRUB then chainloads the
+# freshly-built SelectOS manager, isolating the manager test from OVMF's
+# direct loading of a GNU-EFI PE/COFF binary.
+[[ -s "$ROOT/EFI/BOOT/grubx64.efi" ]] || {
+  echo "ERROR: Expected GRUB EFI bootstrap binary is missing." >&2
+  exit 1
+}
+cp "$ROOT/EFI/BOOT/grubx64.efi" "$WORK/BOOTX64.EFI"
+cat > "$WORK/grub.cfg" <<'GRUB'
+set timeout=0
+set default=0
+search --no-floppy --file --set=root /EFI/SelectOS/selectos.efi
+chainloader /EFI/SelectOS/selectos.efi
+boot
+GRUB
 
 truncate -s 64M "$WORK/uefi-test.img"
 # A whole-device FAT32 removable-media volume exercises the UEFI fallback
@@ -69,8 +80,14 @@ FAT_IMAGE="$WORK/uefi-test.img"
 mkfs.vfat -F 32 -n SELECTOS "$FAT_IMAGE"
 mmd -i "$FAT_IMAGE" ::/EFI
 mmd -i "$FAT_IMAGE" ::/EFI/BOOT
+mmd -i "$FAT_IMAGE" ::/EFI/SelectOS
 mmd -i "$FAT_IMAGE" ::/EFI/ubuntu
+mmd -i "$FAT_IMAGE" ::/boot
+mmd -i "$FAT_IMAGE" ::/boot/grub
 mcopy -i "$FAT_IMAGE" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
+mcopy -i "$FAT_IMAGE" "$WORK/grub.cfg" ::/EFI/BOOT/grub.cfg
+mcopy -i "$FAT_IMAGE" "$WORK/grub.cfg" ::/boot/grub/grub.cfg
+mcopy -i "$FAT_IMAGE" "$WORK/selectos.efi" ::/EFI/SelectOS/selectos.efi
 mcopy -i "$FAT_IMAGE" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
 mdir -i "$FAT_IMAGE" ::/EFI/BOOT
 
