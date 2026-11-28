@@ -62,6 +62,13 @@ trap cleanup EXIT
 
 rm -rf "$DIST"
 mkdir -p "$DIST"
+cat > "$DIST/SELECTOS-BUILD-INFO.txt" <<'EOF'
+PRODUCT=SelectOS
+RUNTIME=legacy-gate-gbox
+LOGIN_FREE=false
+AUTHENTICATION=deferred-not-in-boot-path
+WARNING=This image retains the legacy Gate/Gbox runtime and its login/UI behavior.
+EOF
 dd if=/dev/zero of="$IMG" bs=1M count="$SIZE_MB" status=none
 parted -s "$IMG" mklabel msdos
 parted -s "$IMG" mkpart primary fat32 1MiB 100%
@@ -82,18 +89,11 @@ cp "$ROOT/boot/grub/grub.cfg" "$MNT/boot/grub/"
 cp "$ROOT/config/select.json" "$MNT/gate.json"
 touch "$MNT/gate.marker"
 if compgen -G "$ROOT/icons/*" >/dev/null; then cp -r "$ROOT"/icons/. "$MNT/icons/"; fi
-cat > "$MNT/SELECTOS-BUILD-INFO.txt" <<'EOF'
-PRODUCT=SelectOS
-RUNTIME=legacy-gate-gbox
-LOGIN_FREE=false
-AUTHENTICATION=deferred-not-in-boot-path
-WARNING=This image retains the legacy Gate/Gbox runtime and its login/UI behavior.
-EOF
+cp "$DIST/SELECTOS-BUILD-INFO.txt" "$MNT/SELECTOS-BUILD-INFO.txt"
 sync
 cleanup
 trap - EXIT
 [[ -s "$IMG" ]] || { echo "ERROR: Image was not created." >&2; exit 1; }
-cp "$DIST/SELECTOS-BUILD-INFO.txt" "$DIST/SELECTOS-BUILD-INFO.txt" 2>/dev/null || true
 echo "==> Legacy compatibility image created: $IMG"
 echo "WARNING: Gbox/Gate login has NOT been removed."
 ls -lh "$IMG" "$DIST/SELECTOS-BUILD-INFO.txt"
