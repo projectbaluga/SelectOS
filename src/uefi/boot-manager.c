@@ -5,9 +5,6 @@
 #define MAX_BOOT_ENTRIES 64
 #define EFI_SIMPLE_FS_GUID { 0x964e5b22, 0x6459, 0x11d2, { 0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b } }
 static EFI_GUID SimpleFsGuid = EFI_SIMPLE_FS_GUID;
-static UINTN ConsoleWriteString(const CHAR16 *Text);
-static UINTN ConsoleWriteNumber(UINTN Value);
-static UINTN ConsoleWriteHex(UINTN Value);
 typedef struct { EFI_HANDLE Device; const CHAR16 *Path; const CHAR16 *Label; } BOOT_ENTRY;
 static BOOT_ENTRY Entries[MAX_BOOT_ENTRIES];
 static UINTN EntryCount;
@@ -24,13 +21,6 @@ static VOID WriteTestDiagnostics(VOID) {
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid,
                                NULL, &HandleCount, &Handles);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    ConsoleWriteString(L"SELECTOS_DIAG_FS_STATUS=");
-    ConsoleWriteHex((UINTN)Status);
-    ConsoleWriteString(L"\r\n");
-    ConsoleWriteString(L"SELECTOS_DIAG_FS_COUNT=");
-    ConsoleWriteNumber(HandleCount);
-    ConsoleWriteString(L"\r\n");
-#endif
     for (i = 0; i + 1 < sizeof(Prefix); ++i) Buffer[Length++] = Prefix[i];
     for (i = 0; i + 1 < sizeof(Scan); ++i) Buffer[Length++] = Scan[i];
     {
