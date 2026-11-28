@@ -1,0 +1,8 @@
+# Replace selectos-server.lan with a private DNS name that resolves to the Debian server.
+# Caddy's internal CA is suitable for a managed LAN when its root certificate is
+# installed on administrator browsers and SelectOS endpoint PCs.
+selectos-server.lan {
+    tls internal
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8088
+}
