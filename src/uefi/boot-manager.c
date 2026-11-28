@@ -153,7 +153,7 @@ static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] 
     { L"\\EFI\\fedora\\grubx64.efi", L"Fedora (GRUB)" },
     { L"\\EFI\\opensuse\\shim.efi", L"openSUSE (shim)" },
     { L"\\EFI\\systemd\\systemd-bootx64.efi", L"systemd-boot" },
-    { L"\\\\EFI\\\\refind\\\\refind_x64.efi", L"rEFInd" }
+    { L"\\EFI\\refind\\refind_x64.efi", L"rEFInd" }
 };
 
 static VOID PauseForKey(VOID) {
@@ -176,13 +176,13 @@ static VOID ScanFilesystems(VOID) {
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (EFI_ERROR(Status)) {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_LOCATE_FAILED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_LOCATE_FAILED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     } else if (HandleCount == 0 || Handles == NULL) {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_NO_FS_HANDLES\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_NO_FS_HANDLES\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     } else {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_FS_HANDLES_FOUND\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_FS_HANDLES_FOUND\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
@@ -193,7 +193,7 @@ static VOID ScanFilesystems(VOID) {
         Status = uefi_call_wrapper(BS->HandleProtocol, 3, Handles[i], &SimpleFsGuid, (VOID **)&Fs);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (EFI_ERROR(Status) || Fs == NULL) {
-            CHAR16 Marker[] = L"SELECTOS_SCAN_HANDLE_PROTOCOL_FAILED\\r\\n";
+            CHAR16 Marker[] = L"SELECTOS_SCAN_HANDLE_PROTOCOL_FAILED\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         }
 #endif
@@ -201,7 +201,7 @@ static VOID ScanFilesystems(VOID) {
         Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         if (EFI_ERROR(Status) || Root == NULL) {
-            CHAR16 Marker[] = L"SELECTOS_SCAN_OPEN_VOLUME_FAILED\\r\\n";
+            CHAR16 Marker[] = L"SELECTOS_SCAN_OPEN_VOLUME_FAILED\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         }
 #endif
@@ -212,7 +212,7 @@ static VOID ScanFilesystems(VOID) {
             Found = FileExists(Root, KnownLoaders[j].Path);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
             if (Found) {
-                CHAR16 Marker[] = L"SELECTOS_SCAN_ALLOWLISTED_LOADER_FOUND\\r\\n";
+                CHAR16 Marker[] = L"SELECTOS_SCAN_ALLOWLISTED_LOADER_FOUND\r\n";
                 uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
             }
 #endif
@@ -227,10 +227,10 @@ static VOID ScanFilesystems(VOID) {
     }
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (EntryCount == 0) {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_ZERO_ENTRIES\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_ZERO_ENTRIES\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     } else {
-        CHAR16 Marker[] = L"SELECTOS_SCAN_ENTRIES_FOUND\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_SCAN_ENTRIES_FOUND\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
