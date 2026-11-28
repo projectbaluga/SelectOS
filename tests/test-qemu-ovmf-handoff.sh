@@ -66,7 +66,9 @@ try:
     deadline = time.time() + 20
     while time.time() < deadline:
         if proc.poll() is not None:
-            raise RuntimeError("QEMU exited before QMP became ready")
+            _, stderr = proc.communicate()
+            detail = stderr.decode(errors="replace") if stderr else "(no stderr)"
+            raise RuntimeError(f"QEMU exited before QMP became ready: {detail}")
         try:
             sock.connect(qmp_path)
             break
