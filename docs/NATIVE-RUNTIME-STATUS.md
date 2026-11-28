@@ -21,12 +21,17 @@ Implemented:
     bash scripts/build-native-initramfs.sh
 
 Output:
-- dist/native/vmlinuz
 - dist/native/select-native.img
 - dist/native/BUILD-INFO.txt
 - dist/native/SHA256SUMS
 
 The script does not write a USB, replace boot/select.img, or touch the existing legacy artifact.
+
+## Control Center connection
+
+The Control Center remains optional and is not contacted by PID 1. To connect an installed Linux SelectOS PC after its operating system starts, use the guided agent installer from a repository checkout: install Go, then run `sudo bash auth/agent/install-control-center-agent.sh` from the repository root. It asks for the HTTPS Control Center URL, a unique device ID, and the enrollment token without echoing the secret. The agent runs as a restricted systemd service and sends heartbeats every 30 seconds. Full details are in [Connect a SelectOS Linux PC to Control Center](CONTROL-CENTER-CONNECT.md).
+
+This agent reports inventory/health only. It does not provide remote command execution, remote desktop, reboot/shutdown, or login synchronization. Server outage does not block local boot or use.
 
 ## What is not implemented yet
 
