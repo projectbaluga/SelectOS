@@ -12,12 +12,23 @@ for cmd in gcc ld objcopy qemu-system-x86_64 mkfs.vfat mmd mcopy mtype python3 t
   }
 done
 OVMF_CODE="${SELECTOS_OVMF_CODE:-}"
-if [[ -z "$OVMF_CODE" ]]; then
-  for candidate in /usr/share/OVMF/OVMF_CODE.fd /usr/share/OVMF/OVMF_CODE_4M.fd; do
-    if [[ -s "$candidate" ]]; then OVMF_CODE="$candidate"; break; fi
+OVMF_VARS="${SELECTOS_OVMF_VARS:-}"
+if [[ -z "$OVMF_CODE" || -z "$OVMF_VARS" ]]; then
+  for suffix in _4M ""; do
+    candidate_code="/usr/share/OVMF/OVMF_CODE${suffix}.fd"
+    candidate_vars="/usr/share/OVMF/OVMF_VARS${suffix}.fd"
+    if [[ -s "$candidate_code" && -s "$candidate_vars" ]]; then
+      OVMF_CODE="$candidate_code"
+      OVMF_VARS="$candidate_vars"
+      break
+    fi
   done
 fi
-[[ -s "$OVMF_CODE" ]] || { echo "ERROR: OVMF_CODE firmware image not found." >&2; exit 1; }
+[[ -s "$OVMF_CODE" && -s "$OVMF_VARS" ]] || {
+  echo "ERROR: Matching OVMF_CODE and OVMF_VARS firmware images were not found." >&2
+  exit 1
+}
+cp "$OVMF_VARS" "$WORK/OVMF_VARS.fd"
 
 LDS="$(find /usr/lib /usr/lib64 -type f -name elf_x86_64_efi.lds -print -quit 2>/dev/null)"
 CRT="$(find /usr/lib /usr/lib64 -type f -name crt0-efi-x86_64.o -print -quit 2>/dev/null)"
@@ -48,13 +59,15 @@ mmd -i "$WORK/uefi-test.img" ::/EFI/ubuntu
 mcopy -i "$WORK/uefi-test.img" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
 mcopy -i "$WORK/uefi-test.img" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
 
-python3 - "$WORK/uefi-test.img" "$OVMF_CODE" <<'PY'
+python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" <<'PY'
 import json, os, socket, subprocess, sys, tempfile, time
-image, firmware = sys.argv[1:3]
+image, firmware, variables = sys.argv[1:4]
 qmp_path = os.path.join(tempfile.gettempdir(), f"selectos-qmp-{os.getpid()}.sock")
 cmd = [
     "qemu-system-x86_64", "-machine", "pc,accel=tcg", "-m", "512",
-    "-bios", firmware, "-display", "none", "-serial", "none",
+    "-drive", f"if=pflash,format=raw,readonly=on,file={firmware}",
+    "-drive", f"if=pflash,format=raw,file={variables}",
+    "-display", "none", "-serial", "none",
     "-monitor", "none", "-qmp", f"unix:{qmp_path},server=on,wait=off",
     "-drive", f"if=none,id=stick,format=raw,file={image}",
     "-device", "usb-storage,drive=stick,bootindex=1",
