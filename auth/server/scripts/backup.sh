@@ -13,6 +13,7 @@ trap cleanup EXIT
 docker compose exec -T postgres pg_dump -U selectos -d selectos --no-owner --no-acl > "$TMP"
 test -s "$TMP"
 gzip -9 "$TMP"
+gzip -t "$TMP.gz"
 mv "$TMP.gz" "$OUT"
 chmod 600 "$OUT"
 find "$BACKUP_DIR" -type f -name 'selectos-*.sql.gz' -mtime +30 -delete
