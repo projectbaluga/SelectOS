@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - "scripts/build-image.sh"
+      - "scripts/build-native-initramfs.sh"
+      - "scripts/build-native-image.sh"
+      - "src/native-initramfs/**"
+      - "tests/test-native-image-builder.sh"
+      - "docs/EXPERIMENTAL-NATIVE-IMAGE.md"
       - ".github/workflows/build-image.yml"
       - "config/**"
       - "boot/**"
@@ -25,7 +30,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y parted dosfstools util-linux gzip
+          sudo apt-get install -y parted dosfstools util-linux gzip cpio busybox-static coreutils file
 
       - name: Extract legacy boot files
         shell: bash
@@ -68,8 +73,141 @@ jobs:
             [[ -s "$file" ]] || { echo "::error::Extraction failed: $file"; exit 1; }
           done
 
-      - name: Validate image builder syntax
-        run: bash -n scripts/build-image.sh
+      - name: Validate image builder syntax and safety
+        run: |
+          bash -n scripts/build-image.sh
+          bash -n scripts/build-native-initramfs.sh
+          bash -n scripts/build-native-image.sh
+          bash -n tests/test-native-image-builder.sh
+          bash tests/test-native-image-builder.sh
+
+      - name: Build native experimental initramfs
+        run: bash scripts/build-native-initramfs.sh
+
+      - name: Package native experimental image
+        env:
+          SELECTOS_BUILD_NATIVE_EXPERIMENTAL: "1"
+        run: sudo --preserve-env=SELECTOS_BUILD_NATIVE_EXPERIMENTAL bash scripts/build-native-image.sh
+
+      - name: Verify native image warning manifest
+        run: |
+          test -s dist/native/select-native.img
+          test -s dist/native/SelectOS-native-experimental.img
+          grep -q '^PRODUCTION_READY=false
+        env:
+          SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
+        run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
+
+      - name: Verify image and legacy warning manifest
+        run: |
+          test -s dist/SelectOS.img
+          grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
+          grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
+          file dist/SelectOS.img
+
+      - name: Upload experimental native image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-native-experimental
+          path: |
+            dist/native/SelectOS-native-experimental.img
+            dist/native/BUILD-INFO.txt
+            dist/native/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload legacy image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-legacy-Gate-runtime
+          path: |
+            dist/SelectOS.img
+            dist/SELECTOS-BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  cleanup-finished-runs:
+    name: Clean up completed workflow runs
+    needs: build
+    # Pull-request runs can come from forks and must not receive an Actions write token.
+    # Cleanup runs after manual image builds, even if the build job fails.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete previous completed workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "Finding completed workflow runs to clean up..."
+          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | .id' |
+          while IFS= read -r run_id; do
+            [[ -n "$run_id" ]] || continue
+            if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then
+              continue
+            fi
+            echo "Deleting completed workflow run $run_id"
+            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
+          done
+ <(strings dist/native/SelectOS-native-experimental.img)
+          grep -q '^RUNTIME=native-initramfs-bringup
+        env:
+          SELECTOS_ALLOW_LEGACY_GATE_RUNTIME: "1"
+        run: sudo --preserve-env=SELECTOS_ALLOW_LEGACY_GATE_RUNTIME bash scripts/build-image.sh
+
+      - name: Verify image and legacy warning manifest
+        run: |
+          test -s dist/SelectOS.img
+          grep -q '^LOGIN_FREE=false$' dist/SELECTOS-BUILD-INFO.txt
+          grep -q '^RUNTIME=legacy-gate-gbox$' dist/SELECTOS-BUILD-INFO.txt
+          file dist/SelectOS.img
+
+      - name: Upload legacy image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SelectOS-legacy-Gate-runtime
+          path: |
+            dist/SelectOS.img
+            dist/SELECTOS-BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  cleanup-finished-runs:
+    name: Clean up completed workflow runs
+    needs: build
+    # Pull-request runs can come from forks and must not receive an Actions write token.
+    # Cleanup runs after manual image builds, even if the build job fails.
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete previous completed workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "Finding completed workflow runs to clean up..."
+          gh api --paginate "repos/${GH_REPO}/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | select(.status == "completed") | .id' |
+          while IFS= read -r run_id; do
+            [[ -n "$run_id" ]] || continue
+            if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then
+              continue
+            fi
+            echo "Deleting completed workflow run $run_id"
+            gh api --method DELETE "repos/${GH_REPO}/actions/runs/${run_id}"
+          done
+ <(strings dist/native/SelectOS-native-experimental.img)
 
       - name: Build explicitly marked legacy image
         env:
