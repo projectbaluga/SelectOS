@@ -36,6 +36,10 @@ jobs:
           go vet ./...
           go test ./...
           go build -o /tmp/selectos-auth .
+      - name: Validate dashboard and operational scripts
+        run: |
+          node --check auth/server/dashboard/app.js
+          bash -n auth/server/scripts/backup.sh auth/server/scripts/restore.sh
       - name: Build server Docker image
         run: docker build -t selectos-auth:test auth/server
       - name: Build client
