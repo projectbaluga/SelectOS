@@ -80,7 +80,7 @@ install -m 0644 "${DIST}/select-native.img" "$MNT/boot/select.img"
 install -m 0644 "${ROOT}/boot/grub/grub.cfg" "$MNT/boot/grub/grub.cfg"
 install -m 0644 "${ROOT}/config/select.json" "$MNT/selectos.json"
 touch "$MNT/gate.marker"
-if [[ -d "${ROOT}/icons" ]]; then cp -a "${ROOT}/icons/." "$MNT/icons/"; fi
+if [[ -d "${ROOT}/icons" ]]; then cp -r "${ROOT}/icons/." "$MNT/icons/"; fi
 cat > "$MNT/SELECTOS-BUILD-INFO.txt" <<'INFO'
 PRODUCT=SelectOS
 RUNTIME=native-initramfs-bringup
@@ -92,7 +92,11 @@ PRODUCTION_READY=false
 WARNING=Experimental diagnostic image only; it does not yet select or boot installed operating systems.
 INFO
 sync
-cleanup
+umount "$MNT"
+rmdir "$MNT"
+MNT=""
+losetup -d "$LOOP"
+LOOP=""
 trap - EXIT
 mv -- "$TMP_OUT" "$OUT"
 
