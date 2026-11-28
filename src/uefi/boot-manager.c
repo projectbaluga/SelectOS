@@ -173,15 +173,21 @@ static const CHAR16 C_SYSTEMDBOOT[] = L"\\EFI\\systemd\\systemd-bootx64.efi";
 static const CHAR16 C_REFIND[] = L"\\EFI\\refind";
 static const CHAR16 C_REFINDX64[] = L"\\EFI\\refind\\refind_x64.efi";
 
+static const CHAR16 C_DEBIAN_SHIMX64[] = L"\\EFI\\debian\\shimx64.efi";
+static const CHAR16 C_DEBIAN_GRUBX64[] = L"\\EFI\\debian\\grubx64.efi";
+static const CHAR16 C_FEDORA_SHIMX64[] = L"\\EFI\\fedora\\shimx64.efi";
+static const CHAR16 C_FEDORA_GRUBX64[] = L"\\EFI\\fedora\\grubx64.efi";
+static const CHAR16 C_OPENSUSE_SHIM[] = L"\\EFI\\opensuse\\shim.efi";
+
 static const KNOWN_LOADER KnownLoaders[] = {
     { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager", { C_EFI, C_MICROSOFT, C_BOOT, C_BOOTMGFW }, 4 },
     { L"/EFI/ubuntu/shimx64.efi", L"Ubuntu (shim)", { C_EFI, C_UBUNTU, C_SHIMX64 }, 3 },
     { L"/EFI/ubuntu/grubx64.efi", L"Ubuntu (GRUB)", { C_EFI, C_UBUNTU, C_GRUBX64 }, 3 },
-    { L"/EFI/debian/shimx64.efi", L"Debian (shim)", { C_EFI, C_DEBIAN, C_SHIMX64 }, 3 },
-    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)", { C_EFI, C_DEBIAN, C_GRUBX64 }, 3 },
-    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)", { C_EFI, C_FEDORA, C_SHIMX64 }, 3 },
-    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)", { C_EFI, C_FEDORA, C_GRUBX64 }, 3 },
-    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)", { C_EFI, C_OPENSUSE, C_SHIM }, 3 },
+    { L"/EFI/debian/shimx64.efi", L"Debian (shim)", { C_EFI, C_DEBIAN, C_DEBIAN_SHIMX64 }, 3 },
+    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)", { C_EFI, C_DEBIAN, C_DEBIAN_GRUBX64 }, 3 },
+    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)", { C_EFI, C_FEDORA, C_FEDORA_SHIMX64 }, 3 },
+    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)", { C_EFI, C_FEDORA, C_FEDORA_GRUBX64 }, 3 },
+    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)", { C_EFI, C_OPENSUSE, C_OPENSUSE_SHIM }, 3 },
     { L"/EFI/systemd/systemd-bootx64.efi", L"systemd-boot", { C_EFI, C_SYSTEMD, C_SYSTEMDBOOT }, 3 },
     { L"/EFI/refind/refind_x64.efi", L"rEFInd", { C_EFI, C_REFIND, C_REFINDX64 }, 3 }
 };
