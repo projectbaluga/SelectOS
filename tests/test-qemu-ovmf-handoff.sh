@@ -101,6 +101,7 @@ mcopy -i "$FAT_IMAGE" "$WORK/selectos.efi" ::/EFI/SelectOS/selectos.efi
 mcopy -i "$FAT_IMAGE" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
 mdir -i "$FAT_IMAGE" ::/EFI/BOOT
 mdir -i "$FAT_IMAGE" ::/EFI/SelectOS
+mdir -i "$FAT_IMAGE" ::/EFI/ubuntu
 
 python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" "$WORK/serial.log" <<'PY'
 import json, os, socket, subprocess, sys, tempfile, time
