@@ -153,7 +153,7 @@ static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] 
     { L"\\EFI\\fedora\\grubx64.efi", L"Fedora (GRUB)" },
     { L"\\EFI\\opensuse\\shim.efi", L"openSUSE (shim)" },
     { L"\\EFI\\systemd\\systemd-bootx64.efi", L"systemd-boot" },
-    { L"\\EFI\\refind\\refind_x64.efi", L"rEFInd" }
+    { L"\\EFI\refind\refind_x64.efi", L"rEFInd" }
 };
 
 static VOID PauseForKey(VOID) {
@@ -175,7 +175,7 @@ static VOID ScanFilesystems(VOID) {
     EntryCount = 0;
     Status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &SimpleFsGuid, NULL, &HandleCount, &Handles);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    LocalPrint(L"SCAN_LOCATE_STATUS=%r HANDLE_COUNT=%u\\r\\n", Status, HandleCount);
+    LocalPrint(L"SCAN_LOCATE_STATUS=%r HANDLE_COUNT=%u\r\n", Status, HandleCount);
 #endif
     if (EFI_ERROR(Status) || Handles == NULL) return;
     for (i = 0; i < HandleCount && EntryCount < MAX_BOOT_ENTRIES; ++i) {
@@ -183,12 +183,12 @@ static VOID ScanFilesystems(VOID) {
         EFI_FILE_HANDLE Root = NULL;
         Status = uefi_call_wrapper(BS->HandleProtocol, 3, Handles[i], &SimpleFsGuid, (VOID **)&Fs);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        LocalPrint(L"SCAN_HANDLE=%u PROTOCOL_STATUS=%r\\r\\n", i, Status);
+        LocalPrint(L"SCAN_HANDLE=%u PROTOCOL_STATUS=%r\r\n", i, Status);
 #endif
         if (EFI_ERROR(Status) || Fs == NULL) continue;
         Status = uefi_call_wrapper(Fs->OpenVolume, 2, Fs, &Root);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        LocalPrint(L"SCAN_HANDLE=%u OPEN_VOLUME_STATUS=%r\\r\\n", i, Status);
+        LocalPrint(L"SCAN_HANDLE=%u OPEN_VOLUME_STATUS=%r\r\n", i, Status);
 #endif
         if (EFI_ERROR(Status) || Root == NULL) continue;
         for (j = 0; j < sizeof(KnownLoaders) / sizeof(KnownLoaders[0]); ++j) {
@@ -196,7 +196,7 @@ static VOID ScanFilesystems(VOID) {
             if (EntryCount >= MAX_BOOT_ENTRIES) break;
             Found = FileExists(Root, KnownLoaders[j].Path);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-            if (Found) LocalPrint(L"SCAN_FOUND_HANDLE=%u PATH=%s\\r\\n", i, KnownLoaders[j].Path);
+            if (Found) LocalPrint(L"SCAN_FOUND_HANDLE=%u PATH=%s\r\n", i, KnownLoaders[j].Path);
 #endif
             if (Found) {
                 Entries[EntryCount].Device = Handles[i];
@@ -208,7 +208,7 @@ static VOID ScanFilesystems(VOID) {
         uefi_call_wrapper(Root->Close, 1, Root);
     }
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-    LocalPrint(L"SCAN_ENTRY_COUNT=%u\\r\\n", EntryCount);
+    LocalPrint(L"SCAN_ENTRY_COUNT=%u\r\n", EntryCount);
 #endif
     uefi_call_wrapper(BS->FreePool, 1, Handles);
 }
@@ -328,19 +328,19 @@ static EFI_STATUS LaunchEntry(EFI_HANDLE ImageHandle, const BOOT_ENTRY *Entry) {
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (SystemTable != NULL && SystemTable->ConOut != NULL) {
-        CHAR16 Marker[] = L"SELECTOS_MANAGER_ENTRYPOINT_REACHED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_MANAGER_ENTRYPOINT_REACHED\r\n";
         uefi_call_wrapper(SystemTable->ConOut->OutputString, 2, SystemTable->ConOut, Marker);
     }
 #endif
     InitializeLib(ImageHandle, SystemTable);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     {
-        CHAR16 Marker[] = L"SELECTOS_MANAGER_INITIALIZED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_MANAGER_INITIALIZED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
     WriteTestDiagnostics();
     {
-        CHAR16 Marker[] = L"SELECTOS_DIAGNOSTICS_RETURNED\\r\\n";
+        CHAR16 Marker[] = L"SELECTOS_DIAGNOSTICS_RETURNED\r\n";
         uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
     }
 #endif
@@ -356,12 +356,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         ScanFilesystems();
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         {
-            CHAR16 Marker[] = L"SELECTOS_SCAN_RETURNED\\r\\n";
+            CHAR16 Marker[] = L"SELECTOS_SCAN_RETURNED\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         }
         WriteTestDiagnostics();
         {
-            CHAR16 Marker[] = L"SELECTOS_POSTSCAN_DIAGNOSTICS_RETURNED\\r\\n";
+            CHAR16 Marker[] = L"SELECTOS_POSTSCAN_DIAGNOSTICS_RETURNED\r\n";
             uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker);
         }
 #endif
