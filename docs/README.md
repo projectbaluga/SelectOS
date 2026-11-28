@@ -1,13 +1,21 @@
 # Documentation
 
-## Architecture overview
+## Current architecture
 
 1. **UEFI firmware** loads `EFI/BOOT/BOOTX64.EFI` (or `grubx64.efi`).
-2. The small EFI GRUB config searches for `/select.marker` and loads the real menu from `/boot/grub/grub.cfg`.
-3. GRUB boots the Linux kernel + initramfs (`select.img`).
-4. The Go binary inside the initramfs becomes PID 1, mounts real disks, detects OSes, and presents a selection UI (branded via `select.json`).
-5. On selection it sets EFI BootNext / reboots into the chosen OS (or uses kexec, depending on implementation).
+2. `EFI/BOOT/grub.cfg` searches for `/gate.marker` and loads `/boot/grub/grub.cfg`.
+3. GRUB boots the Linux kernel and initramfs (`/boot/select.img`) with `rdinit=/init`.
+4. The current initramfs is a prebuilt legacy Gate/Gbox runtime. It detects operating systems and presents its selector UI. Its complete source and build recipe are not in this repository.
+5. The current image builder copies the prebuilt runtime; it does not compile or modify its login/UI behavior.
 
-## Runtime config path
+## Authentication status
 
-The boot image currently receives the configuration as `/gate.json`. The source file is named `config/select.json` to match the SelectOS project branding; `scripts/build-image.sh` copies it to the legacy runtime filename for compatibility with the compiled init binary. The original initramfs and its Go `/init` binary are not available in this repository or its releases, so this runtime path remains an explicit compatibility assumption and has not been confirmed with `strings`. If the init binary is later inspected and expects a different path, update the destination in the build script and this note together.
+Authentication is deferred. The `auth/server` and `auth/client` directories are future-feature source only and are not part of the boot image or boot sequence. Initial SelectOS boot must work with no LAN and no internet.
+
+## Runtime configuration compatibility
+
+The legacy boot image receives the configuration as `/gate.json`; `scripts/build-image.sh` copies `config/select.json` to that compatibility path and creates `gate.marker`. These names are legacy runtime requirements, not the intended native SelectOS interface.
+
+## No-login migration
+
+The current prebuilt Gate/Gbox runtime may still display its legacy login. Removing that prompt requires replacing or rebuilding the initramfs from source. See [NO-LOGIN-MIGRATION.md](NO-LOGIN-MIGRATION.md) for the migration contract and acceptance tests.
