@@ -29,7 +29,7 @@ log "Detected block devices:"
 found=0
 for node in /sys/class/block/*; do
   [ -e "$node" ] || continue
-  name=$(basename "$node")
+  name="$(bb basename "$node")"
   case "$name" in loop*|ram*) continue ;; esac
   size="$(bb cat "$node/size" 2>/dev/null)"
   printf '  - %s (%s sectors)\n' "$name" "${size:-unknown}"
