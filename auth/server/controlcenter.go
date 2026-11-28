@@ -149,7 +149,7 @@ func validDeviceID(v string) bool { if len(v)<3||len(v)>64{return false}; for _,
 
 func (s *Server) listDevices(w http.ResponseWriter,r *http.Request,c claims) {
 	rows,err:=s.db.Query(`SELECT id,hostname,platform,version,remote_ip,cpu_percent,memory_percent,disk_percent,enabled,enrolled_at,last_seen,
-		(last_seen > CURRENT_TIMESTAMP - INTERVAL '2 minutes') AS online FROM devices ORDER BY hostname`)
+		(enabled=TRUE AND last_seen > CURRENT_TIMESTAMP - INTERVAL '2 minutes') AS online FROM devices ORDER BY hostname`)
 	if err!=nil { write(w,500,response{"error":"database error"});return }; defer rows.Close()
 	out:=[]response{}
 	for rows.Next(){var id,host,platform,version,ip string;var cpu,mem,disk float64;var enabled,online bool;var enrolled time.Time;var seen sql.NullTime
