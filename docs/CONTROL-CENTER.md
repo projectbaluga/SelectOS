@@ -23,29 +23,20 @@ The Control Center is an administrator-only web console for the Debian server on
 - Audit events are application events, not a full journalctl/syslog viewer.
 - Dashboard administrator authentication is management-plane access; it does not authenticate a person at a SelectOS workstation.
 
-## Deploy the server
+## Deploy the server (one command)
 
-1. On Debian, install Docker Engine and the Compose plugin.
-2. Clone the branch containing this feature, then enter auth/server.
-3. Copy .env.example to .env. Generate three independent secrets:
-   
-       openssl rand -hex 32
-       openssl rand -hex 32
-       openssl rand -hex 32
+1. On Debian, install Docker Engine, the Docker Compose plugin, OpenSSL, and curl.
+2. From the repository root, run:
 
-4. Set SELECTOS_DB_PASSWORD, SELECTOS_AUTH_TOKEN_KEY, SELECTOS_ADMIN_PASSWORD, and SELECTOS_DEVICE_ENROLLMENT_TOKEN in .env. Use unique values. The admin password must be at least 12 characters. Set SELECTOS_BIND_IP to 127.0.0.1 (recommended when placing a TLS reverse proxy on the host). Protect the file:
+       bash auth/server/setup.sh
 
-       chmod 600 .env
+The script handles new installs and updates. For a new installation, it generates independent secrets, creates a private mode-0600 `.env`, and prints the initial administrator password once; save it securely. For an existing installation, it preserves the current `.env`, starts PostgreSQL, creates a compressed backup, and only then rebuilds/updates the API. It refuses to invent new database credentials if an existing PostgreSQL volume is present but the original `.env` is missing or still contains template placeholders.
 
-5. Start the services:
+The script checks the API health endpoint before reporting success. It does not delete Docker volumes. Never run `docker compose down -v` unless you intentionally want to delete the PostgreSQL data.
 
-       docker compose up -d --build
-       docker compose ps
-       curl http://127.0.0.1:8088/healthz
+The default `SELECTOS_BIND_IP` is `127.0.0.1`, intended for a TLS reverse proxy. A sample Caddy configuration is provided in `auth/server/deploy/Caddyfile`. Use a private DNS name and install/trust the private CA certificate on the administrator browser and endpoint PCs. Do not expose port 8088 directly to untrusted networks.
 
-6. Put a TLS reverse proxy in front of the API before allowing browser or agent access from other LAN machines. A sample Caddy configuration is provided in deploy/Caddyfile. Use a private DNS name and install/trust the private CA certificate on the administrator browser and endpoint PCs. Do not expose port 8088 directly to untrusted networks.
-
-For a small isolated test LAN only, SELECTOS_BIND_IP may be set to the Debian server's LAN IP and the dashboard opened at http://SERVER-LAN-IP:8088/dashboard/. HTTP exposes credentials and bearer tokens to anyone able to observe the LAN; do not use this mode on shared/untrusted networks.
+For a small isolated test LAN only, `SELECTOS_BIND_IP` may be set to the Debian server's LAN IP and the dashboard opened at `http://SERVER-LAN-IP:8088/dashboard/`. HTTP exposes credentials and bearer tokens to anyone able to observe the LAN; do not use this mode on shared/untrusted networks.
 
 ## Enroll Linux PCs
 
