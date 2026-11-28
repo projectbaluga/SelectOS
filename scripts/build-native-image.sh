@@ -32,7 +32,7 @@ for f in "${required[@]}"; do
   [[ -s "$f" ]] || { echo "ERROR: Required input missing or empty: $f" >&2; exit 1; }
 done
 
-for cmd in dd parted losetup mkfs.vfat mount umount sync file install sleep mv rm cp mkdir rmdir touch; do
+for cmd in dd parted losetup mkfs.vfat mount umount sync file install sleep mv rm cp mkdir rmdir touch sha256sum; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: Missing build dependency: $cmd" >&2; exit 1; }
 done
 [[ "$SIZE_MB" =~ ^[0-9]+$ ]] && (( SIZE_MB >= 128 )) || {
