@@ -173,6 +173,14 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
     if (Root == NULL || Path == NULL) return NULL;
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
     if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_ENTRY\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+        if (Path == KnownLoaders[2].Path) {
+            ConsoleWriteString(L"SELECTOS_PATH_CODE_UNITS=");
+            ConsoleWriteHex(Path[0]); ConsoleWriteString(L",");
+            ConsoleWriteHex(Path[1]); ConsoleWriteString(L",");
+            ConsoleWriteHex(Path[2]); ConsoleWriteString(L",");
+            ConsoleWriteHex(Path[3]); ConsoleWriteString(L",");
+            ConsoleWriteHex(Path[4]); ConsoleWriteString(L"\r\n");
+        }
 #endif
 
     /* Walk one component at a time. This avoids firmware-specific differences
@@ -183,6 +191,9 @@ static EFI_FILE_HANDLE OpenPathFromRoot(EFI_FILE_HANDLE Root, const CHAR16 *Path
         j = 0;
         while (Path[i] != 0 && Path[i] != (CHAR16)0x005c && Path[i] != (CHAR16)0x002f) {
             if (j + 1 >= sizeof(Component) / sizeof(Component[0])) {
+#ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
+                if (Path == KnownLoaders[2].Path) { CHAR16 M[] = L"SELECTOS_PATH_COMPONENT_TOO_LONG\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, M); }
+#endif
                 if (OwnsCurrent) uefi_call_wrapper(Current->Close, 1, Current);
                 return NULL;
             }
