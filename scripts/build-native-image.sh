@@ -97,6 +97,17 @@ trap - EXIT
 mv -- "$TMP_OUT" "$OUT"
 
 [[ -s "$OUT" ]] || { echo "ERROR: Native image was not created." >&2; exit 1; }
+cat > "${DIST}/IMAGE-BUILD-INFO.txt" <<'INFO'
+PRODUCT=SelectOS
+RUNTIME=native-initramfs-bringup
+LOGIN_FREE=true
+BOOT_SELECTOR=not-implemented
+OS_DISCOVERY=host-side-prototype-only
+UEFI_CHAINLOADING=not-implemented
+PRODUCTION_READY=false
+WARNING=Experimental diagnostic image only; it does not yet select or boot installed operating systems.
+INFO
+sha256sum "$OUT" "${DIST}/IMAGE-BUILD-INFO.txt" > "${DIST}/IMAGE-SHA256SUMS"
 file "$OUT"
 echo "Experimental native image created: $OUT"
 echo "WARNING: diagnostic console only; not a production multi-boot image."
