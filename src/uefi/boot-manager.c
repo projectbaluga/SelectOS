@@ -73,83 +73,79 @@ static UINTN ConsoleWriteString(const CHAR16 *Text) {
     uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, (CHAR16 *)Text);
     return Count;
 }
-static VOID ConsoleWriteChar(CHAR16 Character) {
-    CHAR16 Text[2];
-    Text[0] = Character;
-    Text[1] = 0;
-    if (ST != NULL && ST->ConOut != NULL)
-        uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Text);
+static VOID AppendChar(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, CHAR16 Value) {
+    if (*Length + 1 < Capacity) Buffer[(*Length)++] = Value;
 }
-static UINTN ConsoleWriteNumber(UINTN Value) {
+static VOID AppendString(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, const CHAR16 *Value) {
+    UINTN i;
+    if (Value == NULL) return;
+    for (i = 0; Value[i] != 0 && *Length + 1 < Capacity; ++i)
+        Buffer[(*Length)++] = Value[i];
+}
+static VOID AppendNumber(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, UINTN Value) {
     CHAR16 Digits[24];
     UINTN Count = 0, i;
-    if (Value == 0) {
-        ConsoleWriteChar(L'0');
-        return 1;
-    }
-    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0])) {
-        Digits[Count++] = (CHAR16)(L'0' + (Value % 10));
-        Value /= 10;
-    }
-    for (i = Count; i > 0; --i) ConsoleWriteChar(Digits[i - 1]);
-    return Count;
+    do { Digits[Count++] = (CHAR16)(L'0' + (Value % 10)); Value /= 10; }
+    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
+    for (i = Count; i > 0; --i) AppendChar(Buffer, Length, Capacity, Digits[i - 1]);
 }
-static UINTN ConsoleWriteHex(UINTN Value) {
+static VOID AppendHex(CHAR16 *Buffer, UINTN *Length, UINTN Capacity, UINTN Value) {
     static const CHAR16 Hex[] = L"0123456789ABCDEF";
     CHAR16 Digits[2 * sizeof(UINTN)];
     UINTN Count = 0, i;
-    ConsoleWriteString(L"0x");
-    do {
-        Digits[Count++] = Hex[Value & 0x0f];
-        Value >>= 4;
-    } while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
-    for (i = Count; i > 0; --i) ConsoleWriteChar(Digits[i - 1]);
-    return Count + 2;
+    AppendString(Buffer, Length, Capacity, L"0x");
+    do { Digits[Count++] = Hex[Value & 0x0f]; Value >>= 4; }
+    while (Value != 0 && Count < sizeof(Digits) / sizeof(Digits[0]));
+    for (i = Count; i > 0; --i) AppendChar(Buffer, Length, Capacity, Digits[i - 1]);
 }
-/* Minimal local formatter: avoid GNU-EFI Print/CatPrint library code, which
- * may contain instructions newer than the baseline x86-64 ISA.
+static UINTN ConsoleWriteHex(UINTN Value) {
+    CHAR16 Buffer[2 * sizeof(UINTN) + 3];
+    UINTN Length = 0;
+    AppendHex(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), Value);
+    Buffer[Length] = 0;
+    return ConsoleWriteString(Buffer);
+}
+/* Format into one UTF-16 buffer and call OutputString once. Some firmware
+ * console implementations do not reliably handle a stream of one-character
+ * OutputString calls, especially when output is redirected to a serial log.
  */
 static UINTN LocalPrint(const CHAR16 *Format, ...) {
+    CHAR16 Buffer[1024];
+    UINTN Length = 0, i;
     va_list Args;
-    UINTN Count = 0, i;
     va_start(Args, Format);
-    for (i = 0; Format != NULL && Format[i] != 0; ++i) {
+    for (i = 0; Format != NULL && Format[i] != 0 && Length + 1 < sizeof(Buffer) / sizeof(Buffer[0]); ++i) {
         if (Format[i] != L'%') {
-            ConsoleWriteChar(Format[i]);
-            ++Count;
+            AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), Format[i]);
             continue;
         }
         ++i;
         if (Format[i] == 0) break;
         switch (Format[i]) {
-            case L's': {
-                const CHAR16 *Text = va_arg(Args, const CHAR16 *);
-                Count += ConsoleWriteString(Text);
+            case L's':
+                AppendString(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), va_arg(Args, const CHAR16 *));
                 break;
-            }
             case L'u':
-                Count += ConsoleWriteNumber(va_arg(Args, UINTN));
+                AppendNumber(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), va_arg(Args, UINTN));
                 break;
             case L'c':
-                ConsoleWriteChar((CHAR16)va_arg(Args, int));
-                ++Count;
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), (CHAR16)va_arg(Args, int));
                 break;
             case L'r':
-                Count += ConsoleWriteHex((UINTN)va_arg(Args, EFI_STATUS));
+                AppendHex(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), (UINTN)va_arg(Args, EFI_STATUS));
                 break;
             case L'%':
-                ConsoleWriteChar(L'%');
-                ++Count;
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), L'%');
                 break;
             default:
-                ConsoleWriteChar(L'%');
-                ConsoleWriteChar(Format[i]);
-                Count += 2;
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), L'%');
+                AppendChar(Buffer, &Length, sizeof(Buffer) / sizeof(Buffer[0]), Format[i]);
                 break;
         }
     }
     va_end(Args);
-    return Count;
+    Buffer[Length] = 0;
+    return ConsoleWriteString(Buffer);
 }
 static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] = {
     { L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", L"Windows Boot Manager" },
