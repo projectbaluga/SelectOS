@@ -474,11 +474,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
         LocalPrint(L"===========================================\r\n\r\n");
         LocalPrint(L"Scanning UEFI-readable filesystem volumes...\r\n");
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        { CHAR16 Marker[] = L"SELECTOS_SCAN_CALL_BEGIN\\r\\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+        { CHAR16 Marker[] = L"SELECTOS_SCAN_CALL_BEGIN\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
 #endif
         ScanFilesystems(ImageHandle);
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
-        { CHAR16 Marker[] = L"SELECTOS_SCAN_CALL_END\\r\\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
+        { CHAR16 Marker[] = L"SELECTOS_SCAN_CALL_END\r\n"; uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, Marker); }
 #endif
 #ifdef SELECTOS_QEMU_TEST_DIAGNOSTICS
         {
