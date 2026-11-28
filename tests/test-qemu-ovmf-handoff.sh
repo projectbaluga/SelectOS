@@ -51,6 +51,8 @@ build_efi() {
 }
 build_efi "$ROOT/src/uefi/boot-manager.c" "$WORK/BOOTX64.EFI" boot-manager
 build_efi "$ROOT/tests/uefi-handoff-child.c" "$WORK/grubx64.efi" handoff-child
+echo "UEFI application PE header:"
+objdump -p "$WORK/BOOTX64.EFI" | grep -E "file format|Magic|AddressOfEntryPoint|ImageBase|Subsystem|Machine"
 echo "UEFI application section table:"
 objdump -h "$WORK/BOOTX64.EFI"
 echo "Disassembly near observed OVMF exception offset 0x7e7d:"
@@ -67,6 +69,7 @@ mmd -i "$FAT_IMAGE" ::/EFI/BOOT
 mmd -i "$FAT_IMAGE" ::/EFI/ubuntu
 mcopy -i "$FAT_IMAGE" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
 mcopy -i "$FAT_IMAGE" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
+mdir -i "$FAT_IMAGE" ::/EFI/BOOT
 
 python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" "$WORK/serial.log" <<'PY'
 import json, os, socket, subprocess, sys, tempfile, time
