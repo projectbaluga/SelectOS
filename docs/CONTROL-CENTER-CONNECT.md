@@ -19,7 +19,15 @@ Do not use plain HTTP on an untrusted network: enrollment secrets and bearer tok
 
 ## Install on a SelectOS Linux PC
 
-Build the agent from the repository on the target Linux PC:
+**Simplest method:** from the root of a SelectOS repository checkout, install Go and run the guided installer. It prompts for the server URL, unique device ID, and enrollment secret (hidden input):
+
+    sudo apt-get update
+    sudo apt-get install -y golang-go
+    sudo bash auth/agent/install-control-center-agent.sh
+
+The installer requires HTTPS by default, builds the agent, creates its restricted systemd service account, writes a root-only config file, and starts the service. For an isolated test LAN only, HTTP can be explicitly allowed with `sudo SELECTOS_ALLOW_HTTP=1 bash auth/agent/install-control-center-agent.sh`.
+
+**Manual method:** build the agent from the repository on the target Linux PC:
 
     sudo apt-get update
     sudo apt-get install -y golang-go git
@@ -53,7 +61,7 @@ Install and enable the service:
     sudo systemctl status selectos-agent
     sudo journalctl -u selectos-agent -f
 
-The agent enrolls automatically on first successful connection. It stores its unique device token in the root-restricted state directory. After enrollment, the shared enrollment secret is not needed by the agent; it can be removed from /etc/selectos-agent.env and the service restarted. The device token remains in the state file.
+The agent enrolls automatically on first successful connection. It stores its unique device token in the root-restricted state directory. After enrollment, the agent uses its per-device token for heartbeats. Keep the enrollment secret stored securely so the PC can be re-enrolled if its device token is revoked or lost; it is not sent on normal heartbeat requests.
 
 ## Verify in Control Center
 
