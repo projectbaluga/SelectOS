@@ -9,6 +9,9 @@ if grep -Eiq 'SetVariable|GetVariable|ExitBootServices|efivarfs|BootNext' "$SRC"
 fi
 grep -q 'LocateHandleBuffer' "$SRC"
 grep -q 'EFI_FILE_MODE_READ' "$SRC"
+grep -q 'selectos-debug.log' "$SRC"
+grep -q 'L"selectos-debug.log"' "$SRC"
+grep -q 'SELECTOS_SCAN_RETURNED' "$SRC"
 grep -q 'BuildFileDevicePath' "$SRC"
 grep -q 'LocalPrint' "$SRC"
 if grep -Eq '(^|[^[:alnum:]_])Print[[:space:]]*\(' "$SRC"; then
