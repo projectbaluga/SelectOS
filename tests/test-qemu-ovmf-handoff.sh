@@ -93,6 +93,8 @@ try:
     # Allow OVMF to enumerate the removable FAT volume and launch SelectOS.
     time.sleep(5)
     qmp("human-monitor-command", {"command-line": "sendkey 1"})
+    time.sleep(0.3)
+    qmp("human-monitor-command", {"command-line": "sendkey ret"})
     # The child app writes a marker to the same FAT volume before returning.
     time.sleep(4)
 finally:
