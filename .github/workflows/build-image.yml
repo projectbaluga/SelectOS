@@ -9,6 +9,7 @@ on:
       - "src/native-initramfs/**"
       - "tests/test-native-image-builder.sh"
       - "docs/EXPERIMENTAL-NATIVE-IMAGE.md"
+      - "README.md"
       - ".github/workflows/build-image.yml"
       - "config/**"
       - "boot/**"
