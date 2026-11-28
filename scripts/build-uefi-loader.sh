@@ -29,7 +29,7 @@ ld -nostdlib -znocombreloc -T "$LDS" -shared -Bsymbolic \
   "$CRT" "$WORK/boot-manager.o" -L"$LIBDIR" -lefi -lgnuefi -o "$WORK/boot-manager.so"
 objcopy -j .text -j .sdata -j .data -j .dynamic -j .dynsym \
   -j .rel -j .rela -j .reloc -I elf64-x86-64 -O efi-app-x86_64 "$WORK/boot-manager.so" "$TMP_OUT"
-file "$TMP_OUT" | grep -q 'PE32+.*EFI application.*x86-64' || {
+file "$TMP_OUT" | grep -q 'PE32+.*EFI.*application.*x86-64' || {
   echo "ERROR: Output is not an x86_64 UEFI application." >&2
   file "$TMP_OUT" >&2
   exit 1
