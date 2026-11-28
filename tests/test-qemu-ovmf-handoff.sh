@@ -68,7 +68,7 @@ cp "$ROOT/EFI/BOOT/grubx64.efi" "$WORK/BOOTX64.EFI"
 cat > "$WORK/grub.cfg" <<'GRUB'
 set timeout=0
 set default=0
-search --no-floppy --file --set=root /EFI/SelectOS/selectos.efi
+set root=(hd0)
 chainloader /EFI/SelectOS/selectos.efi
 boot
 GRUB
@@ -90,6 +90,7 @@ mcopy -i "$FAT_IMAGE" "$WORK/grub.cfg" ::/boot/grub/grub.cfg
 mcopy -i "$FAT_IMAGE" "$WORK/selectos.efi" ::/EFI/SelectOS/selectos.efi
 mcopy -i "$FAT_IMAGE" "$WORK/grubx64.efi" ::/EFI/ubuntu/grubx64.efi
 mdir -i "$FAT_IMAGE" ::/EFI/BOOT
+mdir -i "$FAT_IMAGE" ::/EFI/SelectOS
 
 python3 - "$WORK/uefi-test.img" "$OVMF_CODE" "$WORK/OVMF_VARS.fd" "$WORK/serial.log" <<'PY'
 import json, os, socket, subprocess, sys, tempfile, time
