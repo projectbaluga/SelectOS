@@ -57,15 +57,26 @@ func ListBootEntries() ([]BootEntry, error) {
 
 // SetBootNext sets the one-time next boot entry (cleared by firmware after use).
 func SetBootNext(id uint16) error {
+	entries, err := ListBootEntries()
+	if err != nil {
+		return fmt.Errorf("validate BootNext target: %w", err)
+	}
+	found := false
+	for _, entry := range entries {
+		if entry.ID == id { found = true; break }
+	}
+	if !found { return fmt.Errorf("Boot%04X does not exist; refusing to set BootNext", id) }
 	path := filepath.Join(efivarsDir, "BootNext-"+efiGlobalGUID)
 	buf := make([]byte, 6)
 	binary.LittleEndian.PutUint32(buf[0:4], attrNVBSRT)
 	binary.LittleEndian.PutUint16(buf[4:6], id)
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(buf) // efivarfs needs attrs + data in ONE write()
-	return err
+	n, err := f.Write(buf) // efivarfs needs attrs + data in ONE write()
+	if err != nil { return err }
+	if n != len(buf) { return fmt.Errorf("short write to BootNext: wrote %d of %d bytes", n, len(buf)) }
+	return nil
 }
