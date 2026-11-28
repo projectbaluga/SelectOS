@@ -148,16 +148,16 @@ static UINTN LocalPrint(const CHAR16 *Format, ...) {
     return ConsoleWriteString(Buffer);
 }
 static const struct { const CHAR16 *Path; const CHAR16 *Label; } KnownLoaders[] = {
-    { L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", L"Windows Boot Manager" },
-    { L"\\EFI\\ubuntu\\shimx64.efi", L"Ubuntu (shim)" },
-    { L"\\EFI\\ubuntu\\grubx64.efi", L"Ubuntu (GRUB)" },
-    { L"\\EFI\\debian\\shimx64.efi", L"Debian (shim)" },
-    { L"\\EFI\\debian\\grubx64.efi", L"Debian (GRUB)" },
-    { L"\\EFI\\fedora\\shimx64.efi", L"Fedora (shim)" },
-    { L"\\EFI\\fedora\\grubx64.efi", L"Fedora (GRUB)" },
-    { L"\\EFI\\opensuse\\shim.efi", L"openSUSE (shim)" },
-    { L"\\EFI\\systemd\\systemd-bootx64.efi", L"systemd-boot" },
-    { L"\\EFI\\refind\\refind_x64.efi", L"rEFInd" }
+    { L"/EFI/Microsoft/Boot/bootmgfw.efi", L"Windows Boot Manager" },
+    { L"/EFI/ubuntu/shimx64.efi", L"Ubuntu (shim)" },
+    { L"/EFI/ubuntu/grubx64.efi", L"Ubuntu (GRUB)" },
+    { L"/EFI/debian/shimx64.efi", L"Debian (shim)" },
+    { L"/EFI/debian/grubx64.efi", L"Debian (GRUB)" },
+    { L"/EFI/fedora/shimx64.efi", L"Fedora (shim)" },
+    { L"/EFI/fedora/grubx64.efi", L"Fedora (GRUB)" },
+    { L"/EFI/opensuse/shim.efi", L"openSUSE (shim)" },
+    { L"/EFI/systemd/systemd-bootx64.efi", L"systemd-boot" },
+    { L"/EFI/refind/refind_x64.efi", L"rEFInd" }
 };
 
 static VOID PauseForKey(VOID) {
