@@ -7,7 +7,7 @@ REPO="$(cd ../.. && pwd)"
 KVER=6.8.0-151-generic
 W="$(mktemp -d "${TMPDIR:-/tmp}/gate-build.XXXXXX")"
 trap 'rm -rf -- "$W"' EXIT
-mkdir -p ""$W"/k" "$W/rd"/{bin,dev,proc,sys,modules,etc,tmp} "$W/esp"
+mkdir -p "$W/k" "$W/rd"/{bin,dev,proc,sys,modules,etc,tmp} "$W/esp"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$W/rd/init" ./gate
 ( cd "$W/k" && apt-get download linux-image-$KVER linux-modules-$KVER busybox-static >/dev/null 2>&1; for f in *.deb; do dpkg -x $f ex; done )
 K="$W/k/ex"
@@ -71,12 +71,14 @@ fi
 TOTAL=1048576           # 512 MiB in 512B sectors (>=256MiB so FAT32 uses normal 4K clusters)
 START=2048
 SIZE=$((TOTAL - START))
-truncate -s $((TOTAL*512)) $IMG
-sfdisk -q $IMG <<S
+truncate -s $((TOTAL*512)) "$IMG"
+sfdisk -q "$IMG" <<S
 label: dos
 start=$START, size=$SIZE, type=c, bootable
 S
-mkfs.fat -F 32 -s 8 -n GATE -S 512 -h $START --offset $START $IMG $((SIZE/2)) >/dev/null
-mcopy -i "$IMG"@@1M -s $W/esp/* ::
+mkfs.fat -F 32 -s 8 -n GATE -S 512 -h $START --offset $START "$IMG" $((SIZE/2)) >/dev/null
+mcopy -i "$IMG"@@1M -s "$W"/esp/* ::
 echo "Built $IMG"
-[ -n "${ZIP:-}" ] && (cd $W/esp && python3 -c "import shutil,sys;shutil.make_archive(sys.argv[1],'zip','.')" "$ZIP") || true
+if [ -n "${ZIP:-}" ]; then
+  (cd "$W/esp" && python3 -c "import shutil,sys;shutil.make_archive(sys.argv[1],'zip','.')" "$ZIP")
+fi
